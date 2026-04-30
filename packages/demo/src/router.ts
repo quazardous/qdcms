@@ -8,7 +8,8 @@ declare module 'vue-router' {
 }
 
 export const router = createRouter({
-  history: createWebHistory(),
+  // BASE_URL tracks Vite's `base` config — `/` in dev, `/qdcms/` on GitHub Pages.
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
