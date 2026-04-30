@@ -1,0 +1,32 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  color: #111;
+  background: #fafafa;
+}
+
+.qdcms-layout--default {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100vh;
+}
+
+.qdcms-layout__body {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  gap: 1rem;
+  padding: 1rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.qdcms-layout__main { min-width: 0; }
+.qdcms-layout__aside { min-width: 0; }
+
+.qdcms-region[data-region="header"] { display: flex; align-items: center; gap: 1rem; padding: 0.5rem 1rem; background: white; border-bottom: 1px solid #eee; }
+.qdcms-region[data-region="header"] > .login-cta { margin-left: auto; }
+
+main { padding: 1rem 0; }
