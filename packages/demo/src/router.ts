@@ -1,12 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { PageRenderer, type StackLevelMetaTemplate } from 'qdcms'
 
-// Every public route renders the same PageRenderer. The composer decides
-// what fills it based on the active stack derived from `meta.stack`.
-//
-// This is the heart of block-centric: routes ship a *stack template*, not a
-// page component. The stack is the matching surface; routes are just inputs.
-
 declare module 'vue-router' {
   interface RouteMeta {
     stack?: StackLevelMetaTemplate[]
@@ -22,39 +16,39 @@ export const router = createRouter({
       meta: { stack: [{ type: 'page', name: 'home' }] },
     },
     {
-      path: '/events',
+      path: '/realisations',
       component: PageRenderer,
-      meta: { stack: [{ type: 'collection', name: 'events' }] },
+      meta: { stack: [{ type: 'collection', name: 'realisations' }] },
     },
     {
-      path: '/events/:slug',
+      path: '/realisations/:slug',
       component: PageRenderer,
       meta: {
         stack: [
-          { type: 'collection', name: 'events' },
-          { type: 'item', name: 'event', idParam: 'slug' },
+          { type: 'collection', name: 'realisations' },
+          { type: 'item', name: 'realisation', idParam: 'slug' },
         ],
       },
     },
     {
-      path: '/courts',
+      path: '/prestations',
       component: PageRenderer,
-      meta: { stack: [{ type: 'collection', name: 'courts' }] },
+      meta: { stack: [{ type: 'page', name: 'prestations' }] },
+    },
+    {
+      path: '/demarche',
+      component: PageRenderer,
+      meta: { stack: [{ type: 'page', name: 'demarche' }] },
+    },
+    {
+      path: '/contact',
+      component: PageRenderer,
+      meta: { stack: [{ type: 'page', name: 'contact' }] },
     },
     {
       path: '/me',
       component: PageRenderer,
       meta: { stack: [{ type: 'page', name: 'me' }] },
-    },
-    {
-      path: '/me/bookings',
-      component: PageRenderer,
-      meta: {
-        stack: [
-          { type: 'page', name: 'me' },
-          { type: 'collection', name: 'bookings', params: { scope: 'self' } },
-        ],
-      },
     },
     { path: '/:pathMatch(.*)*', component: PageRenderer, meta: { stack: [] } },
   ],

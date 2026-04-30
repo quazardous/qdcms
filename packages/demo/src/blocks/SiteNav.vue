@@ -4,26 +4,14 @@ import { RouterLink } from 'vue-router'
 
 <template>
   <nav class="site-nav">
-    <RouterLink to="/">Home</RouterLink>
-    <RouterLink to="/events">Events</RouterLink>
-    <RouterLink to="/courts">Courts</RouterLink>
-    <RouterLink to="/me">My space</RouterLink>
+    <RouterLink to="/" class="site-nav__brand">
+      <span class="site-nav__brand-mark">✿</span> Flower Craft
+    </RouterLink>
+    <div class="site-nav__links">
+      <RouterLink to="/realisations">Réalisations</RouterLink>
+      <RouterLink to="/prestations">Prestations</RouterLink>
+      <RouterLink to="/demarche">Démarche</RouterLink>
+      <RouterLink to="/contact">Contact</RouterLink>
+    </div>
   </nav>
 </template>
-
-<style scoped>
-.site-nav {
-  display: flex;
-  gap: 1rem;
-  padding: 0.5rem 1rem;
-  background: #f4f4f4;
-}
-.site-nav a {
-  text-decoration: none;
-  color: #333;
-}
-.site-nav a.router-link-active {
-  font-weight: bold;
-  color: #2563eb;
-}
-</style>

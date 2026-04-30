@@ -9,6 +9,7 @@
     "preview": "vite preview --port 5180"
   },
   "dependencies": {
+    "open-props": "^1.7.23",
     "qdcms": "*",
     "vue": "^3.5.0",
     "vue-router": "^4.4.0"

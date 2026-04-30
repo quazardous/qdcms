@@ -1,26 +1,24 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 defineProps<{
   title?: string
   tagline?: string
+  eyebrow?: string
+  cta?: string
+  ctaTo?: string
 }>()
+const router = useRouter()
 </script>
 
 <template>
-  <div class="hero">
-    <h1>{{ title }}</h1>
-    <p v-if="tagline">{{ tagline }}</p>
-  </div>
+  <section class="hero">
+    <div class="hero__inner">
+      <span v-if="eyebrow" class="hero__eyebrow">{{ eyebrow }}</span>
+      <h1>{{ title }}</h1>
+      <p v-if="tagline">{{ tagline }}</p>
+      <button v-if="cta" class="hero__cta" @click="ctaTo && router.push(ctaTo)">
+        {{ cta }} <span aria-hidden>→</span>
+      </button>
+    </div>
+  </section>
 </template>
-
-<style scoped>
-.hero {
-  padding: 3rem 1rem;
-  background: linear-gradient(135deg, #2563eb, #06b6d4);
-  color: white;
-  text-align: center;
-}
-.hero h1 {
-  margin: 0 0 0.5rem;
-  font-size: 2.5rem;
-}
-</style>

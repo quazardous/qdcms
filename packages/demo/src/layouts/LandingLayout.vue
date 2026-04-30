@@ -4,9 +4,11 @@ import { Region } from 'qdcms'
 
 <template>
   <div class="landing">
-    <header><Region name="header" /></header>
+    <Region name="header" />
     <Region name="hero" />
-    <main><Region name="main" /></main>
-    <footer><Region name="footer" /></footer>
+    <main>
+      <Region name="main" />
+    </main>
+    <Region name="footer" />
   </div>
 </template>
