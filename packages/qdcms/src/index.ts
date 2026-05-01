@@ -30,3 +30,29 @@ export { useCms } from './composables/useCms'
 export { default as PageRenderer } from './components/PageRenderer.vue'
 export { default as Region } from './components/Region.vue'
 export { default as DefaultLayout } from './layouts/DefaultLayout.vue'
+
+// i18n routing — see docs/i18n-routing-design.md
+export {
+  LangSwitcher,
+  buildRoutes,
+  buildSlugPath,
+  createDomainUrlBuilder,
+  createPrefixUrlBuilder,
+  detectLocale,
+  discoverLocales,
+  findMissingSlugs,
+  findRouteByName,
+  listRouteNames,
+  matchLocaleFromUrl,
+  persistLocaleCookie,
+  type BuildRoutesOptions,
+  type BuiltRoutes,
+  type DetectLocaleOptions,
+  type DomainUrlBuilderOptions,
+  type Locale,
+  type LocaleUrlBuilder,
+  type PrefixUrlBuilderOptions,
+  type RouteComponent,
+  type RouteSpec,
+  type SlugTable,
+} from './i18n'
