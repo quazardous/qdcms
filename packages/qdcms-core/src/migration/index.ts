@@ -31,3 +31,5 @@ export {
   type ColumnOwnership,
   type TableOwnership,
 } from './OwnershipTracker'
+
+export * from './hints/index'

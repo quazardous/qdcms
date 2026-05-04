@@ -25,6 +25,7 @@
  * The contract surface stays the same.
  */
 
+import { lt as semverLt } from 'semver'
 import {
   composePluginSchema,
   composeFullSchema,
@@ -33,6 +34,11 @@ import {
   type Migration,
   type SqlDialect,
 } from '../migration'
+import {
+  loadUpgrades,
+  resolveUpgradeChain,
+  type UpgradeFile,
+} from '../migration/hints'
 import {
   PluginConflictError,
   PluginDependencyError,
@@ -43,6 +49,7 @@ import {
 } from '../plugin'
 import { MikroOrmBackendStorage } from './MikroOrmBackendStorage'
 import { SqlMigrationStore } from './SqlMigrationStore'
+import { StepExecutor } from './StepExecutor'
 
 export interface MikroOrmMigrationRunnerOptions {
   storage: MikroOrmBackendStorage
@@ -66,16 +73,29 @@ export class MikroOrmMigrationRunner {
   }
 
   /**
-   * Install a plugin: compute the new full schema, update the DB, record
-   * the migration. Idempotent — if the same hash is already applied, no-op.
+   * Install (or upgrade) a plugin.
+   *
+   * Behaviour:
+   * - If the plugin has never been applied → fresh install: optionally
+   *   apply hint files <= manifest.version (in semver order), then run
+   *   the structural diff.
+   * - If a previous version is recorded and is < manifest.version →
+   *   upgrade: load hints, resolve chain (current, target], apply each
+   *   in order via StepExecutor, then structural diff as safety net.
+   * - If recorded version == manifest.version → idempotent no-op.
+   * - If recorded version > manifest.version → throws (downgrade not
+   *   supported in Phase 2).
+   *
+   * Pass `pluginPath` so the runner can find `<pluginPath>/upgrades/`.
+   * Without it, no hints are consulted (Phase 1b behaviour).
    *
    * Throws if:
    * - plugin not in registry
-   * - any dependency is not currently installed (caller should resolveOrder
-   *   and install in topological order)
+   * - any dependency is not currently installed
+   * - hints chain has a min_version guard the running state can't satisfy
    * - storage is not connected or fails mid-update
    */
-  async install(pluginId: PluginId): Promise<Migration> {
+  async install(pluginId: PluginId, pluginPath?: string): Promise<Migration> {
     const entry = this.registry.get(pluginId)
     if (!entry) {
       throw new MigrationError(`unknown plugin "${pluginId}"`, pluginId)
@@ -106,16 +126,58 @@ export class MikroOrmMigrationRunner {
       return migration
     }
 
+    // Downgrade detection — refuse if recorded version > target.
+    const previousRow = await this.store.latestApplied(pluginId)
+    if (previousRow && semverLt(manifest.version, previousRow.pluginVersion)) {
+      throw new MigrationError(
+        `cannot install "${pluginId}" v${manifest.version}: ` +
+          `current state is v${previousRow.pluginVersion} (downgrade not supported)`,
+        pluginId,
+      )
+    }
+
     // Schema-managed = false: skip DB schema work but still track state.
     if (manifest.schemaManaged === false) {
-      await this.store.record(migration)
+      await this.store.recordExtended(migration, {
+        pluginVersion: manifest.version,
+        upgradeFile: null,
+        renderedSchema: composePluginSchema(manifest),
+        appliedSql: null,
+      })
       this.registry.setState(pluginId, 'installed')
       return migration
     }
 
+    // ─── Apply hint files (if any) before the structural diff ─────────
+    // Phase 2: hints live at <pluginPath>/upgrades/<target>.yaml.
+    // The runner discovers them, resolves the chain (current, target],
+    // applies each in transaction via StepExecutor, records each
+    // transition, then runs the structural diff as a safety net.
+    if (pluginPath) {
+      const { files: upgradeFiles, errors: loadErrors } =
+        await loadUpgrades(pluginPath)
+      if (loadErrors.length > 0) {
+        throw new MigrationError(
+          `failed to load upgrade hints for "${pluginId}": ` +
+            loadErrors.map((e) => `${e.filePath}: ${e.error.message}`).join('; '),
+          pluginId,
+        )
+      }
+      const { chain } = resolveUpgradeChain({
+        currentVersion: previousRow?.pluginVersion ?? null,
+        targetVersion: manifest.version,
+        files: upgradeFiles,
+      })
+      if (chain.length > 0) {
+        await this.applyHintChain(chain, manifest)
+      }
+    }
+
     // Compose desired state = currently active + this one.
     const activeManifests = this.activeManifests()
-    const desiredManifests = [...activeManifests, manifest]
+    const desiredManifests = activeManifests.some((m) => m.id === pluginId)
+      ? activeManifests
+      : [...activeManifests, manifest]
     const desired = composeFullSchema(desiredManifests)
 
     // Reload MikroORM with new entity set, then ask SchemaGenerator to
@@ -126,11 +188,17 @@ export class MikroOrmMigrationRunner {
     await this.storage.connect()
     await this.store.init() // ensure system table exists post-reconnect
 
+    let appliedSql: string | null = null
     try {
-      await this.storage
-        .getOrm()
-        .getSchemaGenerator()
-        .updateSchema({ safe: false, dropTables: false })
+      // Capture the SQL via getUpdateSchemaSQL() before applying — gives
+      // us the audit trail. Then call updateSchema() which actually
+      // applies it. Tiny double-traversal but small in practice.
+      const generator = this.storage.getOrm().getSchemaGenerator()
+      appliedSql = await generator.getUpdateSchemaSQL({
+        safe: false,
+        dropTables: false,
+      })
+      await generator.updateSchema({ safe: false, dropTables: false })
     } catch (cause) {
       this.registry.setState(pluginId, 'failed', cause as Error)
       throw new MigrationError(
@@ -141,7 +209,19 @@ export class MikroOrmMigrationRunner {
       )
     }
 
-    await this.store.record(migration)
+    // Record the structural-diff outcome — UNLESS the hint chain
+    // already recorded a row with this exact (plugin, hash). The chain's
+    // last hint records the target-version state; the structural diff
+    // is just a safety net and (in the happy path) emits no extra SQL,
+    // so its row would be a duplicate.
+    if (!(await this.store.isApplied(pluginId, migration.hash))) {
+      await this.store.recordExtended(migration, {
+        pluginVersion: manifest.version,
+        upgradeFile: null,
+        renderedSchema: composePluginSchema(manifest),
+        appliedSql,
+      })
+    }
     this.registry.setState(pluginId, 'installed')
     return migration
   }
@@ -205,10 +285,15 @@ export class MikroOrmMigrationRunner {
     await this.store.init()
 
     try {
-      await this.storage
-        .getOrm()
-        .getSchemaGenerator()
-        .updateSchema({ safe: false, dropTables: true })
+      const generator = this.storage.getOrm().getSchemaGenerator()
+      // SQL captured for audit but not yet persisted on uninstall —
+      // we just unrecord the row. Future Phase 2 enrichment may keep
+      // a "uninstall trace" log table.
+      void (await generator.getUpdateSchemaSQL({
+        safe: false,
+        dropTables: true,
+      }))
+      await generator.updateSchema({ safe: false, dropTables: true })
     } catch (cause) {
       this.registry.setState(pluginId, 'failed', cause as Error)
       throw new MigrationError(
@@ -262,6 +347,60 @@ export class MikroOrmMigrationRunner {
   private async lastAppliedHash(pluginId: PluginId): Promise<string | null> {
     const rows = await this.store.appliedFor(pluginId)
     return rows.length > 0 ? rows[rows.length - 1].hash : null
+  }
+
+  /**
+   * Apply a chain of upgrade hint files. Each file runs in its own
+   * transaction (delegated to the StepExecutor). After each successful
+   * file, a row is inserted in qdcms_schema_state with the rendered
+   * schema snapshot at that intermediate version and a separate hash.
+   *
+   * The chain advances the persisted plugin_version step by step, so a
+   * crash in the middle leaves a consistent on-disk state at the last
+   * successfully-applied version (the next upgrade attempt resumes
+   * from there).
+   */
+  private async applyHintChain(
+    chain: UpgradeFile[],
+    manifest: PluginManifest,
+  ): Promise<void> {
+    const executor = new StepExecutor(this.storage, this.dialect)
+    for (const file of chain) {
+      const composedAtTarget = composePluginSchema(manifest)
+      const intermediateHash = hashSchema({
+        pluginId: manifest.id,
+        pluginVersion: file.targetVersion,
+        schema: composedAtTarget,
+        dialect: this.dialect,
+      })
+      try {
+        const { appliedSql } = await executor.executeFile(file, { manifest })
+        await this.store.recordExtended(
+          {
+            plugin: manifest.id,
+            pluginVersion: file.targetVersion,
+            hash: intermediateHash,
+            dialect: this.dialect,
+            up: appliedSql,
+            down: '',
+          },
+          {
+            pluginVersion: file.targetVersion,
+            upgradeFile: file.filePath.split('/').slice(-1)[0],
+            renderedSchema: composedAtTarget,
+            appliedSql,
+          },
+        )
+      } catch (cause) {
+        this.registry.setState(manifest.id, 'failed', cause as Error)
+        throw new MigrationError(
+          `upgrade hint "${file.filePath}" failed: ${(cause as Error).message}`,
+          manifest.id,
+          intermediateHash,
+          cause,
+        )
+      }
+    }
   }
 
   /**
