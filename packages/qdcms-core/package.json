@@ -1,0 +1,47 @@
+{
+  "name": "@quazardous/qdcms-core",
+  "version": "0.1.0",
+  "description": "qdcms plugin/migration/entity framework — agnostic core consumed by qdcms-backend, qdcms-frontend and any qdcms-aware app",
+  "author": "quazardous",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./entity": "./src/entity/index.ts",
+    "./plugin": "./src/plugin/index.ts",
+    "./migration": "./src/migration/index.ts",
+    "./sql": "./src/sql/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mikro-orm/core": "^6.6.14",
+    "@mikro-orm/migrations": "^6.6.14",
+    "@mikro-orm/sqlite": "^6.6.14",
+    "@quazardous/qdcore": "file:../../../qdadm/packages/qdcore",
+    "better-sqlite3": "^12.9.0",
+    "semver": "^7.7.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/semver": "^7.7.1",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
+  },
+  "keywords": [
+    "qdcms",
+    "plugin-framework",
+    "migration",
+    "entity",
+    "schema-diff"
+  ]
+}
