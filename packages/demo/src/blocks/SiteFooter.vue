@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
+import { LocaleLink } from 'qdcms'
 </script>
 
 <template>
@@ -14,9 +14,9 @@ import { RouterLink } from 'vue-router'
       <div class="site-footer__col">
         <h4>Atelier</h4>
         <ul>
-          <li><RouterLink to="/realisations">Réalisations</RouterLink></li>
-          <li><RouterLink to="/prestations">Prestations</RouterLink></li>
-          <li><RouterLink to="/demarche">Démarche éco</RouterLink></li>
+          <li><LocaleLink name="realisations">Réalisations</LocaleLink></li>
+          <li><LocaleLink name="prestations">Prestations</LocaleLink></li>
+          <li><LocaleLink name="demarche">Démarche éco</LocaleLink></li>
         </ul>
       </div>
       <div class="site-footer__col">

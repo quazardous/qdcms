@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { LocaleLink } from 'qdcms'
 import { realizations } from '../data/realizations'
 
 const props = defineProps<{ limit?: number; heading?: string; lead?: string }>()
@@ -18,10 +18,11 @@ const items = computed(() => realizations.slice(0, props.limit ?? 100))
       <p v-if="lead" class="portfolio__lead">{{ lead }}</p>
     </div>
     <div class="portfolio__grid">
-      <RouterLink
+      <LocaleLink
         v-for="r in items"
         :key="r.slug"
-        :to="`/realisations/${r.slug}`"
+        name="realisation"
+        :params="{ slug: r.slug }"
         class="portfolio-card"
       >
         <div
@@ -35,7 +36,7 @@ const items = computed(() => realizations.slice(0, props.limit ?? 100))
             {{ r.location ?? '' }}<span v-if="r.location"> · </span>{{ r.date }}
           </div>
         </div>
-      </RouterLink>
+      </LocaleLink>
     </div>
   </section>
 </template>

@@ -1,13 +1,24 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-defineProps<{
+import { useLocaleUrl } from 'qdcms'
+
+const props = defineProps<{
   title?: string
   tagline?: string
   eyebrow?: string
   cta?: string
-  ctaTo?: string
+  /** Logical route name to navigate to on CTA click. */
+  ctaName?: string
+  /** Optional params for the CTA route. */
+  ctaParams?: Record<string, string | number>
 }>()
 const router = useRouter()
+const urlFor = useLocaleUrl()
+
+function onCta(): void {
+  if (!props.ctaName) return
+  void router.push(urlFor(props.ctaName, props.ctaParams))
+}
 </script>
 
 <template>
@@ -16,7 +27,7 @@ const router = useRouter()
       <span v-if="eyebrow" class="hero__eyebrow">{{ eyebrow }}</span>
       <h1>{{ title }}</h1>
       <p v-if="tagline">{{ tagline }}</p>
-      <button v-if="cta" class="hero__cta" @click="ctaTo && router.push(ctaTo)">
+      <button v-if="cta && ctaName" class="hero__cta" @click="onCta">
         {{ cta }} <span aria-hidden>→</span>
       </button>
     </div>

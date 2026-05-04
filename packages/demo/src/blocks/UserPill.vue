@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
-import { useCms } from 'qdcms'
+import { useRouter } from 'vue-router'
+import { LocaleLink, useCms, useLocaleUrl } from 'qdcms'
 
 const cms = useCms()
 const router = useRouter()
+const urlFor = useLocaleUrl()
 
 const initial = computed(() => {
   const id = cms.context.auth.userId ?? 'U'
@@ -18,15 +19,15 @@ const name = computed(() => {
 
 function logout() {
   cms.setAuth({ isAuthenticated: false, roles: [] })
-  router.push('/')
+  void router.push(urlFor('home'))
 }
 </script>
 
 <template>
   <div class="user-pill">
-    <RouterLink to="/me" class="user-pill__avatar" :aria-label="`Espace de ${name}`">
+    <LocaleLink name="me" class="user-pill__avatar" :aria-label="`Espace de ${name}`">
       {{ initial }}
-    </RouterLink>
+    </LocaleLink>
     <button class="user-pill__logout" @click="logout">Déconnexion</button>
   </div>
 </template>

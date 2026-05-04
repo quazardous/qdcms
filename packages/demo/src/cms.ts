@@ -70,7 +70,9 @@ cms.place('hero', {
     title: 'Compositions vivantes, locales et de saison.',
     tagline: 'Mariages, événements, lieux de vie. Chaque pièce est composée à partir de ce qui pousse, ici, maintenant.',
     cta: 'Voir les réalisations',
-    ctaTo: '/realisations',
+    // Logical route name — resolved at render time via `useLocaleUrl()`.
+    // Hardcoded paths are forbidden in qdcms code.
+    ctaName: 'realisations',
   },
 })
 

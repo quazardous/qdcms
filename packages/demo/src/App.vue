@@ -1,42 +1,69 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRoute, useRouter, RouterLink } from 'vue-router'
-import { LangSwitcher, bindRouter, useCms } from 'qdcms'
+import { onMounted, onUnmounted, shallowRef, type Component } from 'vue'
+import { LangSwitcher, bindRouter, declaredStackBuilder, useCms, withLocale } from 'qdcms'
+import { useRouter } from 'vue-router'
+import { DebugBar, type CollectorMeta, type DebugBridge } from '@quazardous/qddebug'
 import { LOCALES, buildUrl } from './router'
+import { createDemoDebug } from './debug/createDebug'
+import StatePanel from './debug/StatePanel.vue'
 
-const route = useRoute()
+// State-only qdcms collectors: render their snapshot().state via ObjectTree.
+//
+// `as unknown as Record<string, Component>` shuts up vue-tsc when the workspace
+// has two physical Vue installations (one in qdadm/ via the qddebug `file:`
+// link, one in qdcms/). Vite dedupes them at runtime — no actual problem.
+const debugPanels = {
+  'cms-context': StatePanel,
+  'composed-page': StatePanel,
+} as unknown as Record<string, Component>
+
+const debugMeta: Record<string, CollectorMeta> = {
+  'cms-context': { icon: 'pi-sitemap', label: 'Context', color: '#3b82f6' },
+  'composed-page': { icon: 'pi-th-large', label: 'Composed', color: '#06b6d4' },
+}
+
 const router = useRouter()
 const cms = useCms()
+const bridge = shallowRef<DebugBridge | null>(null)
 
-const showDebug = ref(import.meta.env.DEV)
-
-let stop: (() => void) | null = null
+let stopRouter: (() => void) | null = null
 onMounted(() => {
-  stop = bindRouter(router, cms)
+  stopRouter = bindRouter(router, cms, { stackBuilder: withLocale(declaredStackBuilder) })
+  if (import.meta.env.DEV) {
+    bridge.value = createDemoDebug(cms)
+  }
 })
-onUnmounted(() => stop?.())
-
-const activeLocale = computed(() => (route.meta.locale as string | undefined) ?? '?')
-const currentRouteName = computed(() => (route.meta.routeName as string | undefined) ?? '?')
+onUnmounted(() => {
+  stopRouter?.()
+  bridge.value?.uninstall()
+  bridge.value = null
+})
 </script>
 
 <template>
   <RouterView />
-  <div v-if="showDebug" class="debug-bar">
-    <span>route: <code>{{ route.path }}</code></span>
-    <span>locale: <code>{{ activeLocale }}</code> / name: <code>{{ currentRouteName }}</code></span>
-    <span>stack: <code>{{ cms.context.stack.map(l => `${l.type}:${l.name}${l.id ? '#' + l.id : ''}`).join(' / ') || '∅' }}</code></span>
-    <span>auth: <code>{{ cms.context.auth.isAuthenticated ? 'in' : 'out' }}</code></span>
-    <span class="links">
-      <RouterLink :to="buildUrl(activeLocale === '?' ? 'en' : activeLocale, 'home')">home</RouterLink>
-      <RouterLink :to="buildUrl(activeLocale === '?' ? 'en' : activeLocale, 'realisations')">works</RouterLink>
-      <RouterLink :to="buildUrl(activeLocale === '?' ? 'en' : activeLocale, 'me')">me</RouterLink>
-    </span>
-    <LangSwitcher :locales="LOCALES" :build-url="buildUrl" />
-    <button
-      type="button"
-      @click="showDebug = false"
-      style="background: transparent; border: 1px solid #555; color: #ccc; cursor: pointer; padding: 0 0.5rem; border-radius: 3px; font-size: inherit; font-family: inherit;"
-    >hide</button>
+
+  <!-- Floating language switch (independent of the debug bar so it stays
+       visible even with debug disabled). To be moved into a proper header
+       block once header blocks become locale-aware. -->
+  <div class="demo-lang-switcher">
+    <LangSwitcher :locales="LOCALES" :build-url="buildUrl" variant="dropdown" />
   </div>
+
+  <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
+  <DebugBar v-if="bridge" :bridge="(bridge as any)" :panels="(debugPanels as any)" :collector-meta="debugMeta" />
 </template>
+
+<style scoped>
+.demo-lang-switcher {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(4px);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+</style>

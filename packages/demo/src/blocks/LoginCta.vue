@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { useCms } from 'qdcms'
+import { useCms, useLocaleUrl } from 'qdcms'
 import { useRouter } from 'vue-router'
 
 const cms = useCms()
 const router = useRouter()
+const urlFor = useLocaleUrl()
 
 function fakeLogin() {
   cms.setAuth({
@@ -12,7 +13,7 @@ function fakeLogin() {
     userId: 'juliette',
   })
   // Redirect to pro space to make the auth flip visible
-  router.push('/me')
+  void router.push(urlFor('me'))
 }
 </script>
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { LocaleLink } from 'qdcms'
 import { findRealization } from '../data/realizations'
 
 const props = defineProps<{ slug?: string | null }>()
@@ -21,6 +21,6 @@ const realization = computed(() => findRealization(props.slug))
     <div class="realization__body" style="white-space: pre-line;">{{ realization.body }}</div>
   </article>
   <div v-else>
-    <p>Réalisation introuvable. <RouterLink to="/realisations">Toutes les réalisations</RouterLink></p>
+    <p>Réalisation introuvable. <LocaleLink name="realisations">Toutes les réalisations</LocaleLink></p>
   </div>
 </template>
