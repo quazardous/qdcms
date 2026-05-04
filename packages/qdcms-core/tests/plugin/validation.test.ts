@@ -24,19 +24,27 @@ const baseManifest = (): PluginManifest => ({
 
 describe('plugin validation primitives', () => {
   describe('isValidPluginId', () => {
+    // Plugin id == npm package name (npm-pure mode). Tests the npm-aligned
+    // regex: scoped names allowed, dots/digits allowed (lodash.debounce,
+    // 9001 are real npm names), uppercase forbidden, leading _/. forbidden.
     it.each([
       ['core', true],
       ['dynamic_content', true],
       ['my-shop', true],
       ['a', true],
       ['x9z_2-c', true],
+      ['9core', true], // npm: digit-first names are valid
+      ['core.dot', true], // npm: dots are valid (e.g. lodash.debounce)
+      ['@scope/qdcms-plugin-foo', true],
+      ['@my-org/qdcms-plugin-shop', true],
+      ['@quazardous/qdcms-plugin-core', true],
       ['', false],
-      ['Core', false],
-      ['9core', false],
-      ['_core', false],
+      ['Core', false], // uppercase
+      ['_core', false], // leading underscore
       ['core space', false],
-      ['core.dot', false],
       ['CORE', false],
+      ['@/foo', false], // empty scope
+      ['@scope/', false], // empty name
     ])('isValidPluginId(%j) === %s', (input, expected) => {
       expect(isValidPluginId(input)).toBe(expected)
     })

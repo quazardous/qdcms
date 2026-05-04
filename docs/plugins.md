@@ -102,6 +102,7 @@ site.
 |---|---|
 | `/entity` | EntityDescriptor, EntityRegistry, Repository, BackendStorage, FrontendStorage (contracts) |
 | `/plugin` | PluginManifest, Plugin, PluginRegistry contract, **InMemoryPluginRegistry** reference impl, validateManifest |
+| `/loader` | `buildManifestFromPackageJson` — npm-pure manifest adapter (see §16) |
 | `/migration` | Migration, MigrationContext, MigrationRunner contract, hashSchema, composeSchema, OwnershipTracker (Node-only) |
 | `/sql` | MikroOrmBackendStorage, SqlMigrationStore, MikroOrmMigrationRunner (concrete SQL impl, Node-only) |
 
@@ -129,43 +130,77 @@ referenced (registered) is, for the base impl, simply present and
 operational. The active/inactive distinction is a richer concept that
 qdcms-backend's registry will introduce; qdcore stays out of it.
 
-## 5. Plugin manifest
+## 5. Plugin manifest — split between `package.json` and `qdcms-plugin.yaml`
+
+qdcms is **npm-pure** (see §16). A plugin is an npm package; its
+identity (id, version) and inter-plugin dependencies live in
+`package.json` where npm validates and resolves them. The
+qdcms-specific bits (prefix, entities, extensions) live in a
+companion YAML file.
+
+### 5.1 The `package.json` side
+
+```json
+{
+  "name": "@my-org/qdcms-plugin-shop",
+  "version": "0.1.0",
+  "keywords": ["qdcms-plugin"],
+  "qdcms": "qdcms-plugin.yaml",
+  "peerDependencies": {
+    "@my-org/qdcms-plugin-core": "^1.0.0"
+  }
+}
+```
+
+Carries:
+- `name` → `manifest.id`
+- `version` → `manifest.version`
+- `peerDependencies` (filtered to qdcms plugins) → `manifest.dependencies`
+- `keywords: ["qdcms-plugin"]` — discovery marker for the
+  NodeModulesPluginLoader (Phase 3)
+- `qdcms` field → relative path of the YAML manifest (defaults to `qdcms-plugin.yaml`)
+
+npm validates `version` is strict semver. npm validates that
+`peerDependencies` ranges resolve to a single version installed in
+`node_modules`. qdcms-core does NOT re-validate this — it trusts
+npm's resolution.
+
+### 5.2 The `qdcms-plugin.yaml` side
 
 ```yaml
-# plugins/dynamic-content/qdcms-plugin.yaml
-id: dynamic-content
-version: 0.1.0
-prefix: dc
-title: Dynamic Content
-description: Custom post types and field UI
-dependencies:
-  - id: core
-    version: '^1.0.0'   # semver range, npm-style
+# qdcms-plugin.yaml
+prefix: shop
+title: Shop
+description: E-commerce plugin
 entities:
-  posts:
+  orders:
     fields:
       id: { type: uuid, pk: true }
-      title: { type: string, length: 255 }
+      total_cents: { type: integer }
       created_at: { type: timestamp, default: now }
 extensions:
   core_users:
-    bio: { type: text, nullable: true }
+    last_order_at: { type: timestamp, nullable: true }
 schemaManaged: true   # default, can be set to false
 ```
 
-The manifest describes the **current** state of the plugin only. No
+**Forbidden in YAML**: `id`, `version`, `dependencies`. The
+`buildManifestFromPackageJson` adapter rejects any YAML containing
+those — they'd duplicate (or contradict) `package.json`.
+
+The YAML describes the **current** state of the plugin only. No
 historical baggage, no inline upgrade annotations — those live in the
 `upgrades/` directory (see section 9).
 
-### 5.1 Naming rules
+### 5.3 Naming rules
 
 | field | regex | notes |
 |---|---|---|
-| `id` | `^[a-z][a-z0-9_-]*$` | lowercase, dashes OK |
+| `id` (== package.json#name) | `^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$` | npm package name rules — scoped names allowed, lowercase only, dots/digits accepted |
 | `prefix` | `^[a-z][a-z0-9_]*$` | lowercase, **no dashes** (would break table naming on some dialects) |
-| `version` | strict semver `MAJOR.MINOR.PATCH[-prerelease][+build]` | validated at register time |
+| `version` (== package.json#version) | strict semver `MAJOR.MINOR.PATCH[-prerelease][+build]` | validated by npm at publish; qdcms re-checks the manifest version (defensive) |
 
-### 5.2 Field types
+### 5.4 Field types
 
 | type | mapped to (SQLite) | mapped to (MariaDB) | mapped to (Postgres) |
 |---|---|---|---|
@@ -185,7 +220,7 @@ Escape hatch: `dbType: 'tsvector'` overrides the portable type when
 dialect-specific features are needed (breaks portability — caller must
 declare `requiresDialect`).
 
-### 5.3 schemaManaged
+### 5.5 schemaManaged
 
 - `true` (default) — qdcms manages the plugin's schema. Migrations
   computed and applied at install/upgrade, rolled back at uninstall.
@@ -211,35 +246,54 @@ declare `requiresDialect`).
 with qdcms-backend's `YamlDbPluginRegistry`. Do not introduce code in
 qdcore that branches on those values.
 
-## 7. Dependencies and version ranges
+## 7. Dependencies and version ranges — delegated to npm
 
-```yaml
-dependencies:
-  - id: core
-    version: '^1.0.0'   # any 1.x.y, not 2.0.0
-  - id: i18n
-    version: '~2.3.0'   # any 2.3.x, not 2.4.0
-  - id: storage
-    version: '>=3.0.0 <4.0.0'   # explicit range
-  - id: monitoring
-    # version omitted == '*' (any version)
+Dependencies are declared in `package.json#peerDependencies` (or
+regular `dependencies` for less-strict cases) using standard npm
+semver range syntax (`^1.0.0`, `~2.3.0`, `>=3.0.0 <4.0.0`,
+`1.0.0 || 2.0.0`, etc.).
+
+```json
+// package.json of a plugin
+{
+  "name": "@my-org/qdcms-plugin-shop",
+  "version": "0.1.0",
+  "peerDependencies": {
+    "@my-org/qdcms-plugin-core": "^1.0.0",
+    "@my-org/qdcms-plugin-i18n": "~2.3.0"
+  }
+}
 ```
 
-**Single version per site.** Unlike npm (which can install multiple
-copies of the same package), qdcms enforces ONE installed version per
-plugin. If two plugins require incompatible ranges of a third, the
-installation fails with a clear error — the consumer must reconcile
-manually (upgrade/downgrade, or forgo one of the plugins).
+The `buildManifestFromPackageJson` adapter filters peerDependencies
++ dependencies on the qdcms-plugin convention (default predicate:
+name contains `qdcms-plugin`) and turns them into the runtime
+`PluginManifest.dependencies` array.
 
-**No auto-resolution.** qdcore does NOT attempt to fetch missing
-dependencies. The consumer's plugin set is what it is; missing deps
-throw at `resolveOrder()` time.
+**Single version per site.** npm can install multiple copies of the
+same package in deep dependency trees. For qdcms plugins we declare
+inter-plugin deps as `peerDependencies` precisely to force the
+admin's `package.json` (the site root) to pin a single installed
+version — same pattern as React, Vue. If multiple copies show up
+anyway, the future Phase 3 NodeModulesPluginLoader detects them and
+refuses to boot until the admin runs `npm dedupe` or aligns versions.
 
-**Validation flow:**
-1. At register time: `validateManifest()` ensures version ranges are
-   valid semver ranges (rejects `'wat'`, accepts `'^1.0.0'`).
-2. At resolve time: `resolveOrder()` runs `semver.satisfies()` on each
-   dep against the installed version; throws on mismatch.
+**No range-satisfaction check in qdcms-core.** The base
+`InMemoryPluginRegistry.resolveOrder()` does NOT call
+`semver.satisfies()` — npm has already validated that the resolved
+version in `node_modules` matches each plugin's peerDep range. Our
+role here is just topo-sort + cycle detection + missing-dep
+detection. This is a deliberate "trust npm" choice (npm-pure mode).
+
+**Plugin discovery and resolution.** The admin runs
+`npm install @my-org/qdcms-plugin-shop` (or `qdcms-cli plugin:install`
+which wraps it). npm resolves the dependency graph, fills
+`node_modules`. The qdcms boot code scans `node_modules` for packages
+with `keywords: ["qdcms-plugin"]`, builds manifests via
+`buildManifestFromPackageJson`, registers them. Cascade upgrades are
+handled at the npm level (`npm update plugin-shop` may pull a new
+plugin-core in the same operation); the qdcms runner detects the
+version delta on next boot and runs the upgrade flow.
 
 ## 8. Schema management
 
@@ -592,25 +646,123 @@ change (MikroORM v6 metadata is fixed at init), which would wipe a
 |---|---|---|
 | **1a** | qdcore contracts + pure helpers (hash, compose, ownership, registry) | ✅ done (commit `12a1c6e`, 120 tests) |
 | **1b** | MikroORM-backed runner, SQLite integration tests | ✅ done (commit `eb37ae0`, 32 tests) |
-| **2** | semver range validation in dependencies | pending |
-| **2** | upgrade detection (plugin_version DB ≠ manifest version) | pending |
-| **2** | enriched `qdcms_schema_state` (plugin_version, upgrade_file, rendered_schema, applied_sql) | pending |
-| **2** | hints loader + executor (declarative steps + TS script) | pending |
-| **2** | resolution algorithm (chain of `upgrades/*.yaml`) + `min_version` enforcement | pending |
-| **2** | structural diff safety net (warn on uncovered destructive ops) | pending |
-| **3** | qdcms-backend package: YamlDbPluginRegistry, PluginOrchestrator, cascade enable, admin UI hooks | pending |
+| **2** | enriched `qdcms_schema_state`, hints loader + executor + resolution + min_version, upgrade detection, structural diff safety net | ✅ done (commit `f90718b`, +83 tests = 235) |
+| **2.1** | npm-pure switch — drop custom semver range layer, add `buildManifestFromPackageJson`, document npm integration | ✅ done (this commit, 232 tests) |
+| **3** | qdcms-backend package: NodeModulesPluginLoader, YamlDbPluginRegistry (YAML config + DB toggle), PluginOrchestrator, cascade enable, admin UI hooks | pending |
 | **3** | multi-dialect testing: MariaDB + Postgres via testcontainers | pending |
-| **3** | cascade upgrade orchestrator (find compatible versions when upgrading dep cascades) | pending |
-| **4** | qdcms-cli: `plugin:install`, `plugin:upgrade`, `plugin:list`, `plugin:validate` (author-side hint chain check) | pending |
-| **4** | YAML loader + plugin discovery (npm package convention) | pending |
+| **3** | cascade upgrade orchestrator (find compatible versions when upgrading dep cascades) — bulk of work delegated to npm | pending |
+| **3** | first official plugin: `qdcms-plugin-core` (users/sessions/auth) as a workspace package | pending |
+| **4** | qdcms-cli: `plugin:install/upgrade/list/disable/remove/validate` wraps npm + runs the runner | pending |
+| **4** | second official plugin: `qdcms-plugin-content` (dynamic content) | pending |
 
-## 15. References
+## 15. npm integration model
 
-- Source: `qdcms/packages/qdcms-core/src/{entity,plugin,migration,sql}/`
-- Tests: `qdcms/packages/qdcms-core/tests/{plugin,migration,sql}/`
+qdcms is **npm-pure** — plugins are npm packages, distribution is the
+npm registry (or a private equivalent), and version resolution is
+delegated entirely to npm.
+
+### Why npm
+
+- Standard distribution model — plugin authors already know `npm publish`
+- Battle-tested semver resolver (npm 7+) with a deterministic lockfile
+- Built-in tooling: `npm install`, `npm update`, `npm outdated`, `npm audit`
+- Private registries supported out of the box (verdaccio, GitHub packages)
+- No custom marketplace to build for v1
+
+### What lives where
+
+| concern | npm | qdcms-core |
+|---|---|---|
+| plugin id | `package.json#name` | mirrored in `manifest.id` |
+| plugin version | `package.json#version` (semver-validated) | mirrored in `manifest.version` |
+| inter-plugin deps | `package.json#peerDependencies` | mirrored in `manifest.dependencies` |
+| dep version range syntax | npm's | nothing — npm validates |
+| dep version satisfaction | npm at install | not re-checked at register |
+| dep cycle detection | not npm's job | `resolveOrder` (DFS) |
+| topological install order | not npm's job | `resolveOrder` |
+| schema/prefix/entities | not npm's job | `qdcms-plugin.yaml` |
+| upgrade hints | not npm's job | `upgrades/<v>.yaml` |
+| schema state per site | not npm's job | `qdcms_schema_state` table |
+
+### Plugin discovery (Phase 3 design)
+
+The future `NodeModulesPluginLoader`:
+
+1. Reads the host site's `package.json#dependencies`
+2. Walks `node_modules`, filters to packages with
+   `keywords: ["qdcms-plugin"]`
+3. For each, reads the package's `package.json` and the YAML pointed
+   to by its `qdcms` field (default: `qdcms-plugin.yaml`)
+4. Calls `buildManifestFromPackageJson({ packageJson, qdcmsYaml })`
+5. Registers the resulting manifest with the `PluginRegistry`
+6. Detects multi-version conflicts (same plugin name installed twice
+   in different node_modules locations) and refuses to boot until
+   the admin runs `npm dedupe` or aligns versions
+
+### Plugin author workflow
+
+```bash
+# Author scaffolds a new plugin — convention package layout:
+my-org/qdcms-plugin-shop/
+  package.json              # name, version, peerDependencies
+  qdcms-plugin.yaml         # prefix, entities, extensions
+  upgrades/                 # optional hint files
+    1.5.0.yaml
+    2.0.0.yaml
+  src/                      # plugin code
+  README.md
+
+# Publish to npm
+npm publish
+```
+
+### Plugin consumer workflow
+
+```bash
+# Add a plugin to a site — npm wrap by qdcms-cli (Phase 4)
+qdcms plugin:install @my-org/qdcms-plugin-shop
+# Under the hood: npm install + register + run install hints + structural diff
+
+# Upgrade
+qdcms plugin:upgrade @my-org/qdcms-plugin-shop
+# Under the hood: npm update + run upgrade hint chain + structural diff
+
+# Disable without removing files (lifecycle DB-only)
+qdcms plugin:disable @my-org/qdcms-plugin-shop
+
+# Full removal
+qdcms plugin:remove @my-org/qdcms-plugin-shop
+# Under the hood: run uninstall hints + drop tables + npm uninstall
+```
+
+### Workspaces — official plugins ship in the qdcms monorepo
+
+The qdcms repo uses npm workspaces. Official plugins live alongside
+the framework as workspace packages:
+
+```
+qdcms/packages/
+  qdcms/                     # vue lib
+  qdcms-core/                # framework (this doc's subject)
+  qdcms-backend/             # backend runtime (Phase 3)
+  qdcms-cli/                 # CLI (Phase 4)
+  qdcms-plugin-core/         # official plugin: users/sessions/auth
+  qdcms-plugin-content/      # official plugin: dynamic content
+  demo/                      # demo app, consumes the official plugins
+```
+
+During development, npm workspaces symlink each plugin into
+`node_modules` — the discovery logic works exactly as for an
+npm-installed plugin. When ready to ship, each workspace publishes
+independently to npm.
+
+## 16. References
+
+- Source: `qdcms/packages/qdcms-core/src/{entity,plugin,loader,migration,sql}/`
+- Tests: `qdcms/packages/qdcms-core/tests/{plugin,loader,hints,migration,sql}/`
 - Shared primitives (SignalBus, Stack, i18n) live in qdcore (qdadm repo):
   `qdadm/packages/qdcore/src/`
 - MikroORM docs (used as the SQL diff engine): https://mikro-orm.io/docs/
-- semver spec (used for dependency ranges): https://semver.org/
-- npm `semver` package (used for range parsing/satisfaction):
+- semver spec (npm-validated): https://semver.org/
+- npm `semver` package (used internally for version comparison only):
   https://www.npmjs.com/package/semver

@@ -31,7 +31,6 @@ export {
   isValidPluginId,
   isValidPluginPrefix,
   isValidSemver,
-  isValidSemverRange,
   validateManifest,
 } from './validation'
 

@@ -4,13 +4,18 @@
  * (e.g. CLI codegen, YAML loader).
  */
 
-import { valid as validSemver, validRange } from 'semver'
+import { valid as validSemver } from 'semver'
 import {
   PluginValidationError,
   type PluginManifest,
 } from './types'
 
-const ID_RE = /^[a-z][a-z0-9_-]*$/
+// Plugin id == npm package name (npm-pure mode). Accept scoped names
+// (`@scope/name`) and the standard npm character set: lowercase
+// letters, digits, hyphens, dots, underscores. Must start with a
+// letter or digit (not `_` or `.`).
+const ID_RE =
+  /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/
 const PREFIX_RE = /^[a-z][a-z0-9_]*$/
 
 export function isValidPluginId(id: string): boolean {
@@ -31,15 +36,11 @@ export function isValidSemver(version: string): boolean {
   return validSemver(version) !== null
 }
 
-/**
- * Whether a string is a valid semver RANGE (e.g. `'^1.0.0'`,
- * `'>=2.3.0'`, `'1.x'`). Used for validating dependency constraints.
- * Empty string and `'*'` both mean "any" and are valid.
- */
-export function isValidSemverRange(range: string): boolean {
-  if (range === '' || range === '*') return true
-  return validRange(range) !== null
-}
+// NOTE: dependency `version` ranges in PluginManifest are no longer
+// validated by qdcms-core — npm is authoritative for plugin distribution
+// and version resolution (see docs/plugins.md §16). The version field on
+// each PluginDependency is informational; npm's lockfile is the source of
+// truth for which version is actually present in node_modules.
 
 /**
  * Validate a manifest. Throws `PluginValidationError` on the first issue.
@@ -99,12 +100,9 @@ export function validateManifest(manifest: PluginManifest): void {
           manifest.id,
         )
       }
-      if (dep.version !== undefined && !isValidSemverRange(dep.version)) {
-        throw new PluginValidationError(
-          `dependency on "${dep.id}" has invalid version range "${dep.version}"`,
-          manifest.id,
-        )
-      }
+      // dep.version is intentionally NOT validated here — npm is
+      // authoritative for version resolution. We carry the range as
+      // informational metadata (admin UI, error messages).
     }
   }
   if (manifest.extensions) {

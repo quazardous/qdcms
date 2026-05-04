@@ -1,6 +1,6 @@
 {
   "name": "@quazardous/qdcms-core",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "qdcms plugin/migration/entity framework — agnostic core consumed by qdcms-backend, qdcms-frontend and any qdcms-aware app",
   "author": "quazardous",
   "license": "MIT",
@@ -10,6 +10,7 @@
     ".": "./src/index.ts",
     "./entity": "./src/entity/index.ts",
     "./plugin": "./src/plugin/index.ts",
+    "./loader": "./src/loader/index.ts",
     "./migration": "./src/migration/index.ts",
     "./sql": "./src/sql/index.ts"
   },

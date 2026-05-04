@@ -3,6 +3,58 @@
 All notable changes to qdcms will be documented in this file.
 This is not a commit log. Keep entries simple, user-focused.
 
+## [qdcms-core 0.2.0] - 2026-05-04
+
+### Changed — npm-pure switch (breaking)
+
+qdcms-core now treats npm as the authoritative source for plugin
+versioning and dependency resolution. The custom range-validation
+and satisfaction-check layer is removed in favour of npm's
+`peerDependencies` + lockfile mechanism.
+
+- **Plugin manifest is now SPLIT** between `package.json` (id,
+  version, dependencies — npm-managed) and `qdcms-plugin.yaml`
+  (prefix, entities, extensions, schemaManaged — qdcms-managed).
+  The new `buildManifestFromPackageJson` adapter (subpath
+  `@quazardous/qdcms-core/loader`) merges them into the unified
+  runtime PluginManifest.
+- **Removed** `isValidSemverRange` from `validation` exports.
+  `validateManifest` no longer rejects malformed dependency version
+  ranges — npm has already validated them at install time.
+- **Removed** the `semver.satisfies()` check in
+  `InMemoryPluginRegistry.resolveOrder()`. The base impl only does
+  topo-sort + cycle + missing-dep detection now. npm enforces version
+  satisfaction before our code runs.
+- **`isValidPluginId` regex relaxed** to accept npm-scoped names
+  (`@scope/name`), digits-first names, and dots (matches npm's own
+  package name rules). Old strict variant rejected `@scope/foo`,
+  `9core`, `lodash.debounce`-style names.
+- **Forbidden in qdcms-plugin.yaml**: `id`, `version`,
+  `dependencies` — they belong in package.json. The adapter throws
+  with a clear message if they appear in the YAML.
+
+### Added
+
+- `@quazardous/qdcms-core/loader` subpath:
+  - `buildManifestFromPackageJson({ packageJson, qdcmsYaml })` —
+    npm-pure manifest adapter
+  - `defaultIsPluginDependency` — predicate matching qdcms plugins
+    by name convention (contains `qdcms-plugin`)
+
+### Tests
+- Removed `tests/plugin/semverRanges.test.ts` (33 tests for the
+  dropped layer). Total qdcms-core test count: 232 passing.
+- Added `tests/loader/packageJsonAdapter.test.ts` — 25 tests
+  covering happy path, peer/dependency filtering, custom predicate,
+  forbidden YAML fields, validation flow.
+
+### Migration note for hypothetical consumers
+
+If you were importing `isValidSemverRange` from
+`@quazardous/qdcms-core/plugin`, switch to checking ranges via
+`semver.validRange()` directly (or use npm's own resolution by
+declaring deps in `package.json`).
+
 ## [qdcms 0.2.0 + qdcms-core 0.1.0] - 2026-05-04
 
 ### Added — `@quazardous/qdcms-core` 0.1.0 (initial release, new package)

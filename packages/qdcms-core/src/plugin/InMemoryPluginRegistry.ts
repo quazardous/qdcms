@@ -27,7 +27,6 @@
  * - Persisting state across reboots (= host job)
  */
 
-import { satisfies } from 'semver'
 import {
   Plugin,
   PluginConflictError,
@@ -163,18 +162,12 @@ export class InMemoryPluginRegistry implements PluginRegistry {
             id,
           )
         }
-        // Version constraint check. Range omitted (or '*' / '') means
-        // any version. Anything else goes through semver.satisfies.
-        const range = dep.version ?? '*'
-        if (range !== '*' && range !== '') {
-          const installedVersion = depEntry.plugin.manifest.version
-          if (!satisfies(installedVersion, range)) {
-            throw new PluginDependencyError(
-              `plugin "${id}" requires "${dep.id}" ${range} but ${installedVersion} is registered`,
-              id,
-            )
-          }
-        }
+        // NOTE: dep.version range satisfaction is NOT checked here —
+        // npm is authoritative for plugin version resolution (see
+        // docs/plugins.md §16). The loader (Phase 3) trusts that the
+        // versions in node_modules already satisfy each plugin's
+        // package.json#peerDependencies; npm refuses the install
+        // otherwise. Our role here is just topo-sort + cycle detection.
         visit(dep.id, [...stack, id])
       }
       color.set(id, 'black')
