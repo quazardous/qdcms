@@ -1,0 +1,38 @@
+{
+  "name": "@quazardous/qdcms-plugin-core",
+  "version": "0.1.0",
+  "description": "qdcms core plugin — users, sessions, the foundation other plugins extend",
+  "author": "quazardous",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "keywords": [
+    "qdcms-plugin",
+    "qdcms",
+    "users",
+    "sessions",
+    "auth"
+  ],
+  "qdcms": "qdcms-plugin.yaml",
+  "files": [
+    "src",
+    "qdcms-plugin.yaml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@quazardous/qdcms-core": "^0.2.0"
+  },
+  "devDependencies": {
+    "@quazardous/qdcms-core": "^0.2.0",
+    "@types/node": "^22.0.0",
+    "better-sqlite3": "^12.9.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8"
+  }
+}

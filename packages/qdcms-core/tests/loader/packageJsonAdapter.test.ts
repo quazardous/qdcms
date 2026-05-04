@@ -56,7 +56,7 @@ describe('buildManifestFromPackageJson — happy path', () => {
     expect(manifest.prefix).toBe('shop')
     expect(manifest.title).toBe('Shop')
     expect(manifest.entities).toBeDefined()
-    expect(manifest.entities?.orders).toBeDefined()
+    expect(manifest.entities?.find((e) => e.name === 'orders')).toBeDefined()
   })
 
   it('extracts dependencies from peerDependencies', () => {

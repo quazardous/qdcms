@@ -1,0 +1,62 @@
+# qdcms-plugin-core — foundational plugin
+#
+# Provides the canonical "users" and "sessions" tables that other
+# plugins extend. Owns the `core_` prefix.
+#
+# This file complements package.json (which carries id, version,
+# peerDependencies). See docs/plugins.md §16.
+
+prefix: core
+title: Core
+description: |
+  Foundational tables (users + sessions) used by qdcms-aware apps and
+  extended by other plugins.
+
+entities:
+  user:
+    tableName: users
+    fields:
+      id:
+        type: uuid
+        pk: true
+      email:
+        type: string
+        length: 255
+        unique: true
+      name:
+        type: string
+        length: 100
+        nullable: true
+      created_at:
+        type: timestamp
+        default: now
+      updated_at:
+        type: timestamp
+        default: now
+    indexes:
+      - fields: [email]
+        unique: true
+
+  session:
+    tableName: sessions
+    fields:
+      id:
+        type: uuid
+        pk: true
+      user_id:
+        type: uuid
+        fk: core_users.id
+        onDelete: cascade
+      token:
+        type: string
+        length: 128
+        unique: true
+      expires_at:
+        type: timestamp
+      created_at:
+        type: timestamp
+        default: now
+    indexes:
+      - fields: [token]
+        unique: true
+      - fields: [user_id]

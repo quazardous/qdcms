@@ -143,7 +143,14 @@ export function buildManifestFromPackageJson(
     .filter(([name]) => isPluginDep(name))
     .map(([id, version]) => ({ id, version }))
 
-  // Compose final manifest
+  // Compose final manifest. YAML gives `entities:` as a mapping
+  // (keyed by entity logical name) — our PluginManifest type wants an
+  // array of EntityDescriptor with `name` explicit, so convert.
+  const entities =
+    yamlObj.entities && typeof yamlObj.entities === 'object'
+      ? entitiesFromYaml(yamlObj.entities as Record<string, unknown>, packageJson.name)
+      : undefined
+
   const manifest: PluginManifest = {
     id: packageJson.name,
     version: packageJson.version,
@@ -152,7 +159,7 @@ export function buildManifestFromPackageJson(
     description:
       typeof yamlObj.description === 'string' ? yamlObj.description : undefined,
     dependencies: dependencies.length > 0 ? dependencies : undefined,
-    entities: yamlObj.entities as PluginManifest['entities'] | undefined,
+    entities,
     extensions: yamlObj.extensions as PluginManifest['extensions'] | undefined,
     schemaManaged:
       typeof yamlObj.schemaManaged === 'boolean' ? yamlObj.schemaManaged : undefined,
@@ -162,6 +169,49 @@ export function buildManifestFromPackageJson(
     validateManifest(manifest)
   }
   return manifest
+}
+
+/**
+ * Convert the YAML `entities:` mapping into the array form
+ * `EntityDescriptor[]` expected by `PluginManifest`. YAML keys become
+ * `name`. Each entry must have at least `tableName` and `fields`.
+ */
+function entitiesFromYaml(
+  obj: Record<string, unknown>,
+  pluginId: string,
+): PluginManifest['entities'] {
+  const out: NonNullable<PluginManifest['entities']> = []
+  for (const [name, raw] of Object.entries(obj)) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new PluginValidationError(
+        `qdcms-plugin.yaml: entity "${name}" must be a mapping`,
+        pluginId,
+      )
+    }
+    const def = raw as Record<string, unknown>
+    // tableName defaults to the entity logical name when omitted —
+    // common case (entity `user` → tableName `users` is just sugar
+    // when the author wants pluralization, otherwise `user` works).
+    const tableName =
+      typeof def.tableName === 'string' && def.tableName.length > 0
+        ? def.tableName
+        : name
+    if (!def.fields || typeof def.fields !== 'object') {
+      throw new PluginValidationError(
+        `qdcms-plugin.yaml: entity "${name}" is missing fields`,
+        pluginId,
+      )
+    }
+    out.push({
+      name,
+      tableName,
+      fields: def.fields as NonNullable<PluginManifest['entities']>[number]['fields'],
+      indexes: Array.isArray(def.indexes)
+        ? (def.indexes as NonNullable<PluginManifest['entities']>[number]['indexes'])
+        : undefined,
+    })
+  }
+  return out
 }
 
 /**
