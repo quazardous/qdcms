@@ -7,6 +7,7 @@ import {
   type App,
   type InjectionKey,
 } from 'vue'
+import { I18N_SIGNALS, createSignalBus, type SignalBus } from '@quazardous/qdcore'
 import type {
   AuthSnapshot,
   BlockDefinition,
@@ -17,10 +18,26 @@ import type {
   PageComposer,
   Placement,
 } from '../types'
+import type { LocaleUrlBuilder } from '../i18n/types'
 import { BlockRegistry } from '../blocks/BlockRegistry'
 import { PlacementRegistry } from '../blocks/PlacementRegistry'
 import { LayoutRegistry } from '../layouts/LayoutRegistry'
 import { DefaultPageComposer } from '../composer/PageComposer'
+
+/**
+ * Public signal names emitted by `cms.signals`. Consumers can subscribe via
+ * `cms.signals.on(CMS_SIGNALS.PAGE_COMPOSED, …)`.
+ *
+ * Locale signals come from `@quazardous/qdcore`'s `I18N_SIGNALS` so qdadm and
+ * qdcms speak the same vocabulary in mono-app setups.
+ */
+export const CMS_SIGNALS = {
+  STACK_CHANGED: 'cms:stack-changed',
+  ROUTE_CHANGED: 'cms:route-changed',
+  AUTH_CHANGED: 'cms:auth-changed',
+  TENANT_CHANGED: 'cms:tenant-changed',
+  PAGE_COMPOSED: 'cms:page-composed',
+} as const
 
 export interface CreateCmsOptions {
   /** Replace the default block resolver. Receives the registries. */
@@ -33,6 +50,20 @@ export interface CreateCmsOptions {
   initialAuth?: AuthSnapshot
   initialTenant?: string
   initialLocale?: string
+  /**
+   * Existing `SignalBus` to use instead of creating a fresh one. Pass the
+   * same instance when mounting alongside qdadm so both sides cross-talk
+   * (e.g. for the i18n bridge).
+   */
+  signals?: SignalBus
+  /**
+   * Locale-aware URL builder. Required for `<LocaleLink>` and
+   * `useLocaleUrl()` to function. May also be set after construction via
+   * `cms.setUrlBuilder(...)` (typical when the slug table lives in a sibling
+   * module that imports `cms` itself). Hardcoded paths in qdcms code are
+   * structurally forbidden — every URL goes through this builder.
+   */
+  urlBuilder?: LocaleUrlBuilder
 }
 
 export interface Cms {
@@ -41,6 +72,21 @@ export interface Cms {
   layouts: LayoutRegistry
   /** Read-only access to the active composer. Use `setComposer()` to replace. */
   readonly composer: PageComposer
+  /**
+   * Generic event bus shared with qdadm and any other consumer. See
+   * {@link CMS_SIGNALS} for built-in signal names; emit your own freely.
+   * Always present (never `undefined`) — central mechanism by design.
+   */
+  signals: SignalBus
+  /**
+   * Active locale-aware URL builder. Read by `<LocaleLink>` and
+   * `useLocaleUrl()`. May be `null` only during the brief window between
+   * `createCms()` and `cms.setUrlBuilder()` — both navigation primitives
+   * throw on use while it's null, by design (hardcoded paths are forbidden).
+   */
+  readonly urlBuilder: Ref<LocaleUrlBuilder | null>
+  /** Replace the active URL builder. */
+  setUrlBuilder(builder: LocaleUrlBuilder | null): void
   context: CmsContext
   /**
    * The composed page for the current context. Re-evaluates whenever context,
@@ -80,6 +126,8 @@ export function createCms(options: CreateCmsOptions = {}): Cms {
   const blocks = new BlockRegistry()
   const placements = new PlacementRegistry()
   const layouts = new LayoutRegistry()
+  const signals = options.signals ?? createSignalBus()
+  const urlBuilder = shallowRef<LocaleUrlBuilder | null>(options.urlBuilder ?? null)
 
   const context = reactive<CmsContext>({
     stack: [],
@@ -89,6 +137,18 @@ export function createCms(options: CreateCmsOptions = {}): Cms {
     auth: options.initialAuth ?? { isAuthenticated: false, roles: [] },
     tenant: options.initialTenant,
     locale: options.initialLocale,
+  })
+
+  // Listen for external `locale:change` requests (e.g. from a sibling qdadm
+  // or a programmatic UI). The setLocale() setter below also emits
+  // `locale:changed` so anyone listening to the bus stays in sync.
+  signals.on(I18N_SIGNALS.LOCALE_CHANGE, (event) => {
+    const next = typeof event.data === 'string' ? event.data : null
+    if (next && next !== context.locale) {
+      context.locale = next
+      bump()
+      void signals.emit(I18N_SIGNALS.LOCALE_CHANGED, next)
+    }
   })
 
   const composerRef = shallowRef<PageComposer>(
@@ -124,7 +184,10 @@ export function createCms(options: CreateCmsOptions = {}): Cms {
         composing.value = true
         result
           .then((page) => {
-            if (mySeq === resolveSeq) composedPage.value = page
+            if (mySeq === resolveSeq) {
+              composedPage.value = page
+              void signals.emit(CMS_SIGNALS.PAGE_COMPOSED, page)
+            }
           })
           .catch((err) => {
             if (mySeq === resolveSeq) {
@@ -138,6 +201,7 @@ export function createCms(options: CreateCmsOptions = {}): Cms {
       } else {
         composedPage.value = result
         composing.value = false
+        void signals.emit(CMS_SIGNALS.PAGE_COMPOSED, result)
       }
     },
     { immediate: true }
@@ -150,6 +214,11 @@ export function createCms(options: CreateCmsOptions = {}): Cms {
     get composer() {
       return composerRef.value
     },
+    signals,
+    urlBuilder,
+    setUrlBuilder(builder) {
+      urlBuilder.value = builder
+    },
     context,
     composedPage,
     composing,
@@ -158,22 +227,27 @@ export function createCms(options: CreateCmsOptions = {}): Cms {
       context.params = params
       context.query = query
       bump()
+      void signals.emit(CMS_SIGNALS.ROUTE_CHANGED, { route, params, query })
     },
     setStack(stack) {
       context.stack = stack
       bump()
+      void signals.emit(CMS_SIGNALS.STACK_CHANGED, { levels: stack })
     },
     setAuth(auth) {
       context.auth = auth
       bump()
+      void signals.emit(CMS_SIGNALS.AUTH_CHANGED, auth)
     },
     setTenant(tenant) {
       context.tenant = tenant
       bump()
+      void signals.emit(CMS_SIGNALS.TENANT_CHANGED, tenant)
     },
     setLocale(locale) {
       context.locale = locale
       bump()
+      if (locale) void signals.emit(I18N_SIGNALS.LOCALE_CHANGED, locale)
     },
     setComposer(c) {
       composerRef.value = c

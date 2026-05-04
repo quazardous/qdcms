@@ -23,12 +23,20 @@ export {
   OverlayPageComposer,
 } from './composer/PageComposer'
 
-export { createCms, CMS_INJECTION, type Cms, type CreateCmsOptions } from './cms/createCms'
+export {
+  createCms,
+  CMS_INJECTION,
+  CMS_SIGNALS,
+  type Cms,
+  type CreateCmsOptions,
+} from './cms/createCms'
 
 export { useCms } from './composables/useCms'
+export { useLocaleUrl, type LocaleUrlHelper } from './composables/useLocaleUrl'
 
 export { default as PageRenderer } from './components/PageRenderer.vue'
 export { default as Region } from './components/Region.vue'
+export { default as LocaleLink } from './components/LocaleLink.vue'
 export { default as DefaultLayout } from './layouts/DefaultLayout.vue'
 
 // i18n routing — see docs/i18n-routing-design.md
@@ -45,6 +53,7 @@ export {
   listRouteNames,
   matchLocaleFromUrl,
   persistLocaleCookie,
+  withLocale,
   type BuildRoutesOptions,
   type BuiltRoutes,
   type DetectLocaleOptions,

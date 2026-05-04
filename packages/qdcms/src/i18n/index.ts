@@ -51,4 +51,6 @@ export {
   type DetectLocaleOptions,
 } from './detectLocale'
 
+export { withLocale } from './localeAwareStackBuilder'
+
 export { default as LangSwitcher } from '../components/i18n/LangSwitcher.vue'

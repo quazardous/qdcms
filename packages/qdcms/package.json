@@ -46,6 +46,9 @@
   "publishConfig": {
     "access": "public"
   },
+  "dependencies": {
+    "@quazardous/qdcore": "file:../../../qdadm/packages/qdcore"
+  },
   "peerDependencies": {
     "vue": "^3.3.0",
     "vue-router": "^4.0.0"
