@@ -1,6 +1,6 @@
 {
   "name": "qdcms",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Block-centric public framework for Vue 3 SPAs, paired with qdadm",
   "author": "David Berlioz <berliozdavid@gmail.com> (https://github.com/quazardous)",
   "license": "MIT",
