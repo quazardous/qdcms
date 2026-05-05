@@ -31,7 +31,9 @@ import {
   composeFullSchema,
   hashSchema,
   MigrationError,
+  type ComposedSchema,
   type Migration,
+  type SchemaMigrator,
   type SqlDialect,
 } from '../migration'
 import {
@@ -48,6 +50,7 @@ import {
   type PluginRegistry,
 } from '../plugin'
 import { MikroOrmBackendStorage } from './MikroOrmBackendStorage'
+import { MikroOrmSchemaMigrator } from './MikroOrmSchemaMigrator'
 import { SqlMigrationStore } from './SqlMigrationStore'
 import { StepExecutor } from './StepExecutor'
 
@@ -57,6 +60,13 @@ export interface MikroOrmMigrationRunnerOptions {
   registry: PluginRegistry
   /** SQL dialect — for hash computation and future per-dialect file lookup. */
   dialect: SqlDialect
+  /**
+   * Optional SchemaMigrator override. Defaults to a
+   * `MikroOrmSchemaMigrator` wrapping the storage. Inject your own
+   * (e.g. a native dialect-aware migrator, or a Drizzle-backed one)
+   * to swap the DDL diff engine without touching the runner.
+   */
+  migrator?: SchemaMigrator
 }
 
 export class MikroOrmMigrationRunner {
@@ -64,12 +74,15 @@ export class MikroOrmMigrationRunner {
   private store: SqlMigrationStore
   private registry: PluginRegistry
   private dialect: SqlDialect
+  private migrator: SchemaMigrator
 
   constructor(opts: MikroOrmMigrationRunnerOptions) {
     this.storage = opts.storage
     this.store = opts.store
     this.registry = opts.registry
     this.dialect = opts.dialect
+    this.migrator =
+      opts.migrator ?? new MikroOrmSchemaMigrator(opts.storage)
   }
 
   /**
@@ -178,36 +191,51 @@ export class MikroOrmMigrationRunner {
     const desiredManifests = activeManifests.some((m) => m.id === pluginId)
       ? activeManifests
       : [...activeManifests, manifest]
-    const desired = composeFullSchema(desiredManifests)
+    const desired = toComposedSchema(composeFullSchema(desiredManifests))
+    const previousComposed = previousRow?.renderedSchema ?? null
 
-    // Reload MikroORM with new entity set, then ask SchemaGenerator to
-    // converge the live DB. Two-step disconnect/reconnect because v6
-    // metadata is fixed at init.
-    await this.storage.disconnect()
-    this.storage.registerEntities(Object.values(desired))
-    await this.storage.connect()
-    await this.store.init() // ensure system table exists post-reconnect
-
-    let appliedSql: string | null = null
+    // Delegate DDL emission to the SchemaMigrator. Default impl
+    // (MikroOrmSchemaMigrator) handles the disconnect/reconnect of
+    // MikroORM internally — additive install (allowDestructive: false).
+    let appliedStmts: string[] = []
     try {
-      // Capture the SQL via getUpdateSchemaSQL() before applying — gives
-      // us the audit trail. Then call updateSchema() which actually
-      // applies it. Tiny double-traversal but small in practice.
-      const generator = this.storage.getOrm().getSchemaGenerator()
-      appliedSql = await generator.getUpdateSchemaSQL({
-        safe: false,
-        dropTables: false,
+      const result = await this.migrator.computeMigration({
+        previous: previousComposed,
+        desired,
+        dialect: this.dialect,
       })
-      await generator.updateSchema({ safe: false, dropTables: false })
+      appliedStmts = result.up
     } catch (cause) {
       this.registry.setState(pluginId, 'failed', cause as Error)
       throw new MigrationError(
-        `install of "${pluginId}" failed during schema update`,
+        `install of "${pluginId}" failed during DDL computation`,
         pluginId,
         migration.hash,
         cause,
       )
     }
+
+    // The MikroOrmSchemaMigrator left the storage reconnected with the
+    // desired entity set — system table is part of the storage's
+    // baseline so it survived. Re-init it just to be safe (cheap).
+    await this.store.init()
+
+    // Apply DDL statements. Each one runs through the storage's
+    // execute() — implementation-agnostic.
+    try {
+      for (const stmt of appliedStmts) {
+        await this.storage.getOrm().em.getConnection().execute(stmt)
+      }
+    } catch (cause) {
+      this.registry.setState(pluginId, 'failed', cause as Error)
+      throw new MigrationError(
+        `install of "${pluginId}" failed while executing DDL`,
+        pluginId,
+        migration.hash,
+        cause,
+      )
+    }
+    const appliedSql = appliedStmts.join(';\n')
 
     // Record the structural-diff outcome — UNLESS the hint chain
     // already recorded a row with this exact (plugin, hash). The chain's
@@ -277,27 +305,43 @@ export class MikroOrmMigrationRunner {
     const remainingManifests = this.activeManifests().filter(
       (m) => m.id !== pluginId,
     )
-    const desired = composeFullSchema(remainingManifests)
+    const desired = toComposedSchema(composeFullSchema(remainingManifests))
+    const previousRow = await this.store.latestApplied(pluginId)
+    const previousComposed: ComposedSchema | null = previousRow?.renderedSchema ?? null
 
-    await this.storage.disconnect()
-    this.storage.registerEntities(Object.values(desired))
-    await this.storage.connect()
-    await this.store.init()
-
+    // Delegate to the SchemaMigrator. Uninstall is destructive
+    // (drop the plugin's tables / extension columns) — set the
+    // option so the migrator emits DROP statements as needed.
+    let appliedStmts: string[] = []
     try {
-      const generator = this.storage.getOrm().getSchemaGenerator()
-      // SQL captured for audit but not yet persisted on uninstall —
-      // we just unrecord the row. Future Phase 2 enrichment may keep
-      // a "uninstall trace" log table.
-      void (await generator.getUpdateSchemaSQL({
-        safe: false,
-        dropTables: true,
-      }))
-      await generator.updateSchema({ safe: false, dropTables: true })
+      const result = await this.migrator.computeMigration({
+        previous: previousComposed,
+        desired,
+        dialect: this.dialect,
+        allowDestructive: true,
+      })
+      appliedStmts = result.up
     } catch (cause) {
       this.registry.setState(pluginId, 'failed', cause as Error)
       throw new MigrationError(
-        `uninstall of "${pluginId}" failed during schema update`,
+        `uninstall of "${pluginId}" failed during DDL computation`,
+        pluginId,
+        undefined,
+        cause,
+      )
+    }
+
+    // Re-init the store table after the migrator's reconnect dance.
+    await this.store.init()
+
+    try {
+      for (const stmt of appliedStmts) {
+        await this.storage.getOrm().em.getConnection().execute(stmt)
+      }
+    } catch (cause) {
+      this.registry.setState(pluginId, 'failed', cause as Error)
+      throw new MigrationError(
+        `uninstall of "${pluginId}" failed while executing DDL`,
         pluginId,
         undefined,
         cause,
@@ -348,6 +392,8 @@ export class MikroOrmMigrationRunner {
     const rows = await this.store.appliedFor(pluginId)
     return rows.length > 0 ? rows[rows.length - 1].hash : null
   }
+
+  // ─── helpers wired into the SchemaMigrator contract ────────────────────
 
   /**
    * Apply a chain of upgrade hint files. Each file runs in its own
@@ -420,3 +466,20 @@ export class MikroOrmMigrationRunner {
 
 // Re-export for convenient typing on the consumer side.
 export type { Plugin } from '../plugin'
+
+// ─── module-level helpers ───────────────────────────────────────────────────
+
+/**
+ * Convert the flat physical-table map produced by composeFullSchema
+ * into the `ComposedSchema` shape consumed by the SchemaMigrator
+ * contract. After composition all extensions are merged into their
+ * owning table; the migrator just needs the flat list.
+ */
+function toComposedSchema(
+  fullSchema: Record<string, import('../entity/types').EntityDescriptor>,
+): import('../migration/types').ComposedSchema {
+  return {
+    ownedTables: Object.values(fullSchema),
+    extensions: {},
+  }
+}

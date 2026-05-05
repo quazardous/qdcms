@@ -20,6 +20,8 @@ export type {
   MigrationRunner,
   MigrationResult,
   MigrationStatusEntry,
+  SchemaMigrator,
+  SchemaMigratorInput,
 } from './types'
 
 export { canonicalJSON } from './canonicalize'

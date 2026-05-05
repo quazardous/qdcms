@@ -95,6 +95,58 @@ export interface ComposedSchema {
   extensions: Record<string, EntityDescriptor['fields']>
 }
 
+// ─── Schema migration contract ────────────────────────────────────────────
+
+/**
+ * SchemaMigrator — pure DDL computation contract.
+ *
+ * Takes the previous and desired schema snapshots, returns the SQL
+ * needed to converge the DB from prev to desired (and the inverse).
+ * Implementations are typically backed by an ORM's schema diff
+ * engine (MikroORM SchemaGenerator, drizzle-kit, knex.schema, …) or
+ * by a custom dialect-aware DDL emitter.
+ *
+ * The contract is intentionally narrow: in / out, no I/O. Execution
+ * is the runner's job (via BackendStorage.execute). Persistence of
+ * applied state is the MigrationStore's job. This separation lets
+ * the same runner work with any combination of (storage impl,
+ * migrator impl) — including impls that come from totally different
+ * libraries.
+ */
+export interface SchemaMigratorInput {
+  previous: ComposedSchema | null
+  desired: ComposedSchema
+  dialect: SqlDialect
+  /**
+   * If `true`, the migrator may emit destructive DDL (DROP TABLE /
+   * DROP COLUMN). Default `false` — additive only. Used by the runner
+   * for uninstall flows; install flows always pass `false`.
+   */
+  allowDestructive?: boolean
+  /**
+   * Implementation-specific tuning options. Migrators can read
+   * properties they understand; the runner does not interpret them.
+   * Use sparingly — the contract is intentionally narrow.
+   */
+  options?: Record<string, unknown>
+}
+
+export interface SchemaMigrator {
+  /**
+   * Compute the DDL needed to bring a schema from `previous` to
+   * `desired`. Empty array(s) when no change is needed.
+   *
+   * - `previous: null` means "fresh install" (no prior state).
+   * - The runner expects the SQL strings to be statement-ready;
+   *   it executes them in order via BackendStorage.execute.
+   * - `down` should reverse `up` when applied in order.
+   *   Migrators that can't compute a reversible diff may return
+   *   an empty `down` array — the runner reports "irreversible"
+   *   to its caller.
+   */
+  computeMigration(input: SchemaMigratorInput): Promise<{ up: string[]; down: string[] }>
+}
+
 // ─── Runner / Store contracts ─────────────────────────────────────────────
 
 /**

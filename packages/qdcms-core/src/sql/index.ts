@@ -29,6 +29,11 @@ export {
 } from './MikroOrmMigrationRunner'
 
 export {
+  MikroOrmSchemaMigrator,
+  type MikroOrmSchemaMigratorOptions,
+} from './MikroOrmSchemaMigrator'
+
+export {
   StepExecutor,
   type ExecuteStepOptions,
   type ExecuteFileOptions,
