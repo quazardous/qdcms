@@ -9,17 +9,23 @@
     "preview": "vite preview --port 5180"
   },
   "dependencies": {
+    "@primeuix/themes": "^1.0.0",
     "@quazardous/qdcms-api-emulator": "*",
     "@quazardous/qdcms-backend": "*",
     "@quazardous/qdcore": "file:../../../qdadm/packages/qdcore",
     "@quazardous/qddebug": "file:../../../qdadm/packages/qddebug",
     "open-props": "^1.7.23",
+    "pinia": "^2.3.0",
+    "primeicons": "^7.0.0",
+    "primevue": "^4.2.5",
+    "qdadm": "file:../../../qdadm/packages/qdadm",
     "qdcms": "*",
     "vue": "^3.5.0",
     "vue-router": "^4.4.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.0",
+    "sass-embedded": "^1.99.0",
     "typescript": "^5.6.0",
     "vite": "^5.4.0",
     "vue-tsc": "^2.1.0"

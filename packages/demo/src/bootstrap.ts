@@ -20,6 +20,7 @@ import { createApp, type App as VueApp, type Component } from 'vue'
 import { router, buildUrl } from './router'
 import { cms } from './cms-instance'
 import './cms' // side-effect: registers blocks/layouts/placements
+import { installQdadm } from './admin/install-qdadm'
 
 export interface BootstrapInput {
   /** Root component. main.ts decides which one (front / admin / shell). */
@@ -35,5 +36,11 @@ export async function bootstrapApp({ App }: BootstrapInput): Promise<VueApp> {
   const app = createApp(App)
   app.use(router)
   cms.install(app)
+
+  // Plug qdadm onto the same Vue app — it shares our router and
+  // SignalBus (via Orchestrator), so admin and front zones see the
+  // same events and navigate the same router.
+  installQdadm(app)
+
   return app
 }
