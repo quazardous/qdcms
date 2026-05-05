@@ -35,18 +35,13 @@ import { signals } from '../shell/signals'
 import { debugBridge } from '../shell/debugBridge'
 import { router } from '../router'
 import AdminHome from './pages/AdminHome.vue'
-
-// Cross-package Vue duplication: qdadm is consumed via `file:` link
-// from a separate npm tree, so its node_modules holds its own copies
-// of `vue` / `vue-router`. Vite dedupes them at runtime; TS still
-// sees two distinct types. Cast the whole options object once via
-// `unknown` — runtime is fine, the cast is a known type-only mismatch.
+import { version as demoVersion } from '../../package.json'
 
 export function installQdadm(app: App): Kernel {
   const options: KernelOptions = {
     // Host injection — Kernel reuses these instead of creating its own.
-    existingApp: app as unknown as KernelOptions['existingApp'],
-    existingRouter: router as unknown as KernelOptions['existingRouter'],
+    existingApp: app,
+    existingRouter: router,
     existingSignals: signals,
     // Mount the entire admin tree under /admin/*. Kernel-emitted
     // routes (`/`, `/:pathMatch(.*)*`, `/login`) become `/admin`,
@@ -58,8 +53,9 @@ export function installQdadm(app: App): Kernel {
     homeRoute: { name: 'admin-home', component: AdminHome },
 
     app: {
-      name: 'Flower Craft — Admin',
-      shortName: 'FC Admin',
+      name: 'Flower Craft',
+      shortName: 'FC',
+      version: demoVersion,
     },
 
     primevue: { plugin: PrimeVue, theme: Aura },
@@ -67,11 +63,11 @@ export function installQdadm(app: App): Kernel {
     // Auto-injects DebugModule. The `bridge` field tells the module
     // to register its collectors onto the host's shared bridge instead
     // of creating its own — the demo renders ONE unified <DebugBar />
-    // covering both qcms and qdadm panels.
+    // covering both qdcms and qdadm panels.
     debugBar: {
       ...debugBar,
       bridge: debugBridge,
-    } as unknown as KernelOptions['debugBar'],
+    },
     notifications: { enabled: true, maxNotifications: 100 },
 
     features: {

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
- * FrontShell — qcms-only shell extras: lang switch, router stack
+ * FrontShell — qdcms-only shell extras: lang switch, router stack
  * binding, body zone class. Mounted on every front route, unmounted
- * on /admin/*. Owns NO admin references — qcms-side only.
+ * on /admin/*. Owns NO admin references — qdcms-side only.
  *
  * The unified `<DebugBar />` lives in `App.vue` (zone-agnostic) and
- * reads the shell-owned shared bridge — qcms's debug collectors are
+ * reads the shell-owned shared bridge — qdcms's debug collectors are
  * registered on it from `bootstrap.ts`. No bridge management here.
  */
 
@@ -20,12 +20,12 @@ const cms = useCms()
 let stopRouter: (() => void) | null = null
 
 onMounted(() => {
-  document.body.classList.add('qcms-zone')
+  document.body.classList.add('qdcms-zone')
   stopRouter = bindRouter(router, cms, { stackBuilder: withLocale(declaredStackBuilder) })
 })
 
 onUnmounted(() => {
-  document.body.classList.remove('qcms-zone')
+  document.body.classList.remove('qdcms-zone')
   stopRouter?.()
   stopRouter = null
 })

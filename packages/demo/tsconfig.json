@@ -11,13 +11,7 @@
     "types": ["vite/client"],
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
-    "baseUrl": ".",
-    "paths": {
-      "vue": ["./node_modules/vue"],
-      "vue-router": ["./node_modules/vue-router"],
-      "@vue/*": ["./node_modules/@vue/*"]
-    }
+    "noEmit": true
   },
   "include": ["src/**/*.ts", "src/**/*.vue"]
 }

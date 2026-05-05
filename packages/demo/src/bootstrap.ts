@@ -7,6 +7,12 @@
  * `globalThis.fetch` already routes to whichever backend is active —
  * we don't need to know which.
  *
+ * Order matters: qdadm's Kernel registers its `/admin/*` routes on
+ * the shared router via `addRoute()`. Those routes MUST be present
+ * before `app.use(router)` triggers vue-router's initial navigation,
+ * otherwise the qdcms catch-all swallows `/admin` on a cold load.
+ * So the host runs `installQdadm(app)` BEFORE `app.use(router)`.
+ *
  * Symfony-flavoured layering:
  *
  *   main.ts                    → infra entry: bundle scope + backend choice
@@ -22,7 +28,7 @@ import { cms } from './cms-instance'
 import './cms' // side-effect: registers blocks/layouts/placements
 import { installQdadm } from './admin/install-qdadm'
 import { debugBridge } from './shell/debugBridge'
-import { addQcmsCollectors } from './debug/createDebug'
+import { addQdcmsCollectors } from './debug/qdcmsCollectors'
 
 export interface BootstrapInput {
   /** Root component. main.ts decides which one (front / admin / shell). */
@@ -36,58 +42,30 @@ export async function bootstrapApp({ App }: BootstrapInput): Promise<VueApp> {
   cms.setUrlBuilder(buildUrl)
 
   const app = createApp(App)
+
+  // Plug qdadm BEFORE `app.use(router)`: the Kernel registers its
+  // `/admin/*` routes on the shared router via `addRoute()`. Doing
+  // that first means vue-router's initial navigation (triggered by
+  // `app.use(router)`) sees the full route table — no need for a
+  // post-mount `router.replace({force:true})` to re-resolve.
+  const kernel = installQdadm(app)
+
   app.use(router)
   cms.install(app)
 
-  // Plug qdadm onto the same Vue app — it shares our router and
-  // SignalBus (via Orchestrator), so admin and front zones see the
-  // same events and navigate the same router. The Kernel also
-  // registers qdadm's debug collectors on the SHARED `debugBridge`
-  // (via the `debugBar.bridge` option), but doesn't install — the
-  // host shell installs once below with a merged context.
-  const kernel = installQdadm(app) as unknown as {
-    zoneRegistry?: unknown
-    activeStack?: unknown
-    stackHydrator?: unknown
-    i18nInstance?: unknown
-    hookRegistry?: unknown
-    orchestrator?: unknown
-  }
-
-  // qcms collectors register on the same shared bridge — ensures
-  // ONE <DebugBar /> can render both qcms and qdadm panels.
+  // qdcms collectors register on the same shared bridge — ensures
+  // ONE <DebugBar /> can render both qdcms and qdadm panels. Single
+  // install at the end covers all collectors with a merged context:
+  // qdadm internals come from `kernel.getDebugContext()` (stable
+  // surface), qdcms contributes `cms`. Each collector picks what it
+  // needs and ignores the rest.
   if (import.meta.env.DEV) {
-    addQcmsCollectors(debugBridge, cms)
-  }
-
-  // Single install with a merged context covering everything any
-  // collector might need: signals (qcms+qdadm), cms (qcms collectors),
-  // router (Zones / Router collectors), zones / activeStack /
-  // stackHydrator / i18n / hooks (qdadm collectors). Each collector
-  // picks what it needs and ignores the rest.
-  if (import.meta.env.DEV) {
+    addQdcmsCollectors(debugBridge)
     debugBridge.install({
-      signals: cms.signals,
+      ...kernel.getDebugContext(),
       cms,
-      router,
-      zones: kernel.zoneRegistry,
-      activeStack: kernel.activeStack,
-      stackHydrator: kernel.stackHydrator,
-      i18n: kernel.i18nInstance,
-      hooks: kernel.hookRegistry,
-      orchestrator: kernel.orchestrator,
     })
   }
-
-  // qdadm's Kernel adds its `/admin/*` routes via `addRoute()` AFTER
-  // `app.use(router)` already registered the qdcms-side routes. The
-  // browser's initial URL was resolved against the partial table (so
-  // a fresh load on `/admin` was caught by qdcms's catch-all). Force
-  // a re-resolve here so the late-added routes take effect on the
-  // current URL.
-  await router.isReady()
-  const current = router.currentRoute.value.fullPath
-  await router.replace({ path: current, force: true })
 
   return app
 }
