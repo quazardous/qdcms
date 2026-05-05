@@ -1,0 +1,43 @@
+{
+  "name": "@quazardous/qdcms-frontend",
+  "version": "0.1.0",
+  "description": "qdcms frontend runtime — ApiFrontendStorage + Vue composables that consume the qdcms-backend HTTP API",
+  "author": "quazardous",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./storage": "./src/storage/index.ts",
+    "./composables": "./src/composables/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@quazardous/qdcms-core": "^0.2.0",
+    "@quazardous/qdcore": "*"
+  },
+  "peerDependencies": {
+    "vue": "^3.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8",
+    "vue": "^3.5.13"
+  },
+  "keywords": [
+    "qdcms",
+    "qdcms-frontend",
+    "vue",
+    "frontend-storage"
+  ]
+}
