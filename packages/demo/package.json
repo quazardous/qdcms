@@ -9,6 +9,8 @@
     "preview": "vite preview --port 5180"
   },
   "dependencies": {
+    "@quazardous/qdcms-api-emulator": "*",
+    "@quazardous/qdcms-backend": "*",
     "@quazardous/qdcore": "file:../../../qdadm/packages/qdcore",
     "@quazardous/qddebug": "file:../../../qdadm/packages/qddebug",
     "open-props": "^1.7.23",

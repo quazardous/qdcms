@@ -166,14 +166,18 @@ function parseInput(
 
   const qdcmsPath = pathname.slice(basePath.length) || '/'
 
-  // Build the query record.
+  // Build the query record. We iterate via forEach because some
+  // bundler type configs don't surface URLSearchParams.keys().
   const query: Record<string, string | string[]> = {}
   if (search) {
     const params = new URLSearchParams(search)
-    for (const key of params.keys()) {
+    const seen = new Set<string>()
+    params.forEach((_value, key) => {
+      if (seen.has(key)) return
+      seen.add(key)
       const all = params.getAll(key)
       query[key] = all.length === 1 ? all[0] : all
-    }
+    })
   }
 
   // Headers (lowercase keys).
