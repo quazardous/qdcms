@@ -1,4 +1,7 @@
-import { createCms, DefaultLayout, DefaultPageComposer } from 'qdcms'
+import { DefaultLayout } from 'qdcms'
+import { cms } from './cms-instance'
+
+export { cms }
 
 import SiteNav from './blocks/SiteNav.vue'
 import SiteFooter from './blocks/SiteFooter.vue'
@@ -17,19 +20,10 @@ import MyProjects from './blocks/MyProjects.vue'
 
 import LandingLayout from './layouts/LandingLayout.vue'
 
-// Composer chooses layout based on the active stack.
-// Home → landing (with hero region); everything else → default.
-export const cms = createCms({
-  composer: (blocks, placements, layouts) =>
-    new DefaultPageComposer(blocks, placements, {
-      layouts,
-      resolveLayout: (ctx) => {
-        const top = ctx.stack[ctx.stack.length - 1]
-        if (top?.type === 'page' && top.name === 'home') return 'landing'
-        return 'default'
-      },
-    }),
-})
+// The composer is configured once in `cms-instance.ts`. This file
+// is responsible for layouts/blocks/placements registration only —
+// keeping the bare instance free of block imports breaks the
+// services.ts ↔ cms.ts circular import.
 
 // ─── LAYOUTS ─────────────────────────────────────────────────────────
 cms.layout('default', DefaultLayout, ['header', 'main', 'footer'])

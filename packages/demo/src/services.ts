@@ -17,7 +17,7 @@ import {
 } from '@quazardous/qdcms-frontend/composables'
 import type { Query } from '@quazardous/qdcms-core/entity'
 import type { Ref } from 'vue'
-import { cms } from './cms'
+import { cms } from './cms-instance'
 
 export const apiStorage = new ApiFrontendStorage({
   baseUrl: '/api/qdcms',

@@ -82,6 +82,13 @@ const built = buildRoutes(slugTable, {
   locales: LOCALES,
   defaultLocale: DEFAULT_LOCALE,
   catchAllComponent: PageRenderer,
+  // Admin lives at a raw, non-localised `/admin` path. We DON'T pass
+  // `reservedPaths: ['/admin']` because the negative-lookahead regex
+  // it generates is rejected by vue-router's path parser. Vue Router
+  // already prioritises explicit paths over the catch-all by
+  // specificity, so `/admin` (added via `router.addRoute()` in
+  // `admin/_register.ts`) wins without further help. The root
+  // redirect is exact-match on `/`, so it never touches `/admin`.
 })
 
 /**

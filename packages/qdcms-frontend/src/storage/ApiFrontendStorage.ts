@@ -82,7 +82,15 @@ export class ApiFrontendStorage implements FrontendStorage {
   constructor(options: ApiFrontendStorageOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, '')
     this.signals = options.signals
-    this.fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis)
+    // When no fetch override is provided, dispatch through
+    // `globalThis.fetch` AT CALL TIME — not at construction time.
+    // This matters because consumers commonly install fetch
+    // monkey-patches (e.g. qdcms-api-emulator) AFTER apiStorage is
+    // already constructed at module-load. Binding here would freeze
+    // the original native fetch and silently bypass any later
+    // interceptor; deferring the lookup keeps the storage agnostic.
+    this.fetchImpl =
+      options.fetch ?? ((input, init) => globalThis.fetch(input, init))
     this.defaultHeaders = options.defaultHeaders ?? {}
   }
 

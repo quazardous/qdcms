@@ -11,13 +11,14 @@
       <h1>Admin Dashboard</h1>
     </header>
     <p>
-      You're seeing this because <code>main.ts</code> uncommented Option B
-      (<code>import './admin/register'</code>). Admin blocks and routes
-      were registered against the shared CMS instance and router at boot.
+      Admin landing — placeholder. The real admin will live under
+      qdadm and progressively replace this block. Today this proves
+      the route + CMS wiring works end-to-end at <code>/admin</code>
+      with its own layout (no public chrome, no locale prefix).
     </p>
     <p>
-      Next step: plug qdadm here, or extend with admin-only blocks that
-      consume the same <code>useDemoCollection</code> /
+      Next step: plug qdadm here, or extend with admin-only blocks
+      that consume the same <code>useDemoCollection</code> /
       <code>useDemoEntity</code> chain as the public site.
     </p>
   </section>

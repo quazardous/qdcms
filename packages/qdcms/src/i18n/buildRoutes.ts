@@ -134,8 +134,25 @@ function normalizeReservedPrefix(prefix: string): string {
  */
 function buildCatchAllPath(reserved: string[]): string {
   if (reserved.length === 0) return '/:pathMatch(.*)*'
-  const lookahead = reserved.map((p) => `${p}(?:/|$)`).join('|')
-  return `/:pathMatch((?!${lookahead}).*)*`
+  // KNOWN LIMITATION: vue-router 4's path parser rejects parentheses
+  // inside `:param(regex)` constraints (it treats `(` as starting a
+  // new path-syntax group), so any negative-lookahead form we'd
+  // generate here trips a `SyntaxError` at `createRouter()` time.
+  //
+  // Until we either bypass that parser or switch strategies (e.g.
+  // emit explicit redirect routes for each reserved prefix), throw
+  // upfront so the failure is obvious instead of a cryptic regex
+  // error from deep inside vue-router. Callers can lean on
+  // vue-router's natural priority — explicit paths beat the
+  // catch-all by specificity, so reservedPaths is rarely needed in
+  // practice.
+  throw new Error(
+    `[qdcms/i18n] reservedPaths is currently incompatible with vue-router 4 ` +
+      `(its path parser rejects parens inside :pathMatch). ` +
+      `Drop reservedPaths and rely on vue-router's specificity-based ` +
+      `matching — explicit paths added via router.addRoute() take ` +
+      `precedence over the catch-all without it.`,
+  )
 }
 
 function flatten(
