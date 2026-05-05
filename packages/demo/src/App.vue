@@ -71,10 +71,12 @@ onUnmounted(() => {
 <template>
   <RouterView />
 
-  <!-- Floating language switch (independent of the debug bar so it stays
-       visible even with debug disabled). To be moved into a proper header
-       block once header blocks become locale-aware. -->
-  <div class="demo-lang-switcher">
+  <!-- Floating language switch — front zone only. The admin (qdadm)
+       has its own chrome and is not URL-localised, so a public-site
+       lang selector there would just leak the front into admin. To
+       be moved into a proper header block once header blocks become
+       locale-aware. -->
+  <div v-if="!isAdmin" class="demo-lang-switcher">
     <LangSwitcher :locales="LOCALES" :build-url="buildUrl" variant="dropdown" />
   </div>
 
