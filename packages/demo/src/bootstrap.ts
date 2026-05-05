@@ -42,5 +42,15 @@ export async function bootstrapApp({ App }: BootstrapInput): Promise<VueApp> {
   // same events and navigate the same router.
   installQdadm(app)
 
+  // qdadm's Kernel adds its `/admin/*` routes via `addRoute()` AFTER
+  // `app.use(router)` already registered the qdcms-side routes. The
+  // browser's initial URL was resolved against the partial table (so
+  // a fresh load on `/admin` was caught by qdcms's catch-all). Force
+  // a re-resolve here so the late-added routes take effect on the
+  // current URL.
+  await router.isReady()
+  const current = router.currentRoute.value.fullPath
+  await router.replace({ path: current, force: true })
+
   return app
 }

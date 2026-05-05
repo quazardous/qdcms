@@ -5,16 +5,15 @@
  * Business config lives in `qdcms.config.ts`; this file just plugs
  * everything into the runtime and exposes the technical toggles.
  *
- * Three responsibilities, kept ultra-thin on purpose:
+ * Two responsibilities, kept ultra-thin on purpose:
  *
  *   1. SCOPE OF THE BUNDLE — single-bundle SPA, front + admin in one
- *      entry point. Splitting into multi-SPA would mean duplicating
- *      this file as `main-admin.ts` + Vite multi-entry — out of scope.
+ *      entry point. Admin (qdadm) is wired by `bootstrap.ts` against
+ *      the same Vue app, sharing router and SignalBus with qdcms.
+ *      Splitting into multi-SPA would mean duplicating this file as
+ *      `main-admin.ts` + Vite multi-entry — out of scope.
  *
- *   2. ADMIN RUNTIME SPLIT — admin code in main bundle (mono) or in
- *      its own chunk (lazy). Toggle below.
- *
- *   3. BACKEND BRIDGE — backend running in this tab (demo-only,
+ *   2. BACKEND BRIDGE — backend running in this tab (demo-only,
  *      static-site friendly) or classic remote (real Node server).
  *      Toggle below — Vite drops the entire in-browser-backend
  *      graph from the bundle when the import is commented out.
@@ -38,15 +37,6 @@ import './style.css'
  *     bundle entirely. Run a server beside the SPA — see the Node
  *     `createBackend` factory in @quazardous/qdcms-backend.        */
 import './install-demo-backend'
-/* ─────────────────────────────────────────────────────────────────── */
-
-/* ─── ADMIN RUNTIME SPLIT — pick ONE ──────────────────────────────────
- *   ▸ mono: admin code is part of the main bundle (sync, simplest).
- *   ▸ lazy: admin code is its own chunk, fetched on first render
- *           (route + block stay registered eagerly, only the
- *           dashboard component code is deferred).                  */
-import './admin/register'           // ← MONO   (current default)
-// import './admin/register.lazy'   // ← LAZY
 /* ─────────────────────────────────────────────────────────────────── */
 
 bootstrapApp({ App }).then((app) => app.mount('#app'))

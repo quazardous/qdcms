@@ -30,7 +30,6 @@ export const cms = createCms({
       resolveLayout: (ctx) => {
         const top = ctx.stack[ctx.stack.length - 1]
         if (top?.type === 'page' && top.name === 'home') return 'landing'
-        if (top?.type === 'page' && top.name === 'admin') return 'admin'
         return 'default'
       },
     }),

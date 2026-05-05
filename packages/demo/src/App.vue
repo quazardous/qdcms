@@ -3,6 +3,10 @@ import { onMounted, onUnmounted, shallowRef, type Component } from 'vue'
 import { LangSwitcher, bindRouter, declaredStackBuilder, useCms, withLocale } from 'qdcms'
 import { useRouter } from 'vue-router'
 import { DebugBar, type CollectorMeta, type DebugBridge } from '@quazardous/qddebug'
+// QdadmRoot renders qdadm's DOM extras (Toast, ToastListener, the
+// qdadm debug bar) when the host owns the Vue app — see
+// admin/install-qdadm.ts.
+import { QdadmRoot } from 'qdadm/components'
 import { LOCALES, buildUrl } from './router'
 import { createDemoDebug } from './debug/createDebug'
 import StatePanel from './debug/StatePanel.vue'
@@ -52,6 +56,10 @@ onUnmounted(() => {
 
   <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
   <DebugBar v-if="bridge" :bridge="(bridge as any)" :panels="(debugPanels as any)" :collector-meta="debugMeta" />
+
+  <!-- qdadm extras: Toast / ToastListener / qdadm debug bar. No-op
+       when the corresponding qdadm options aren't configured. -->
+  <QdadmRoot />
 </template>
 
 <style scoped>
