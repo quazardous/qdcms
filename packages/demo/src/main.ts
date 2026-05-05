@@ -1,5 +1,5 @@
 /**
- * main.ts — infra entry (the Symfony `index.php` of this app).
+ * main.ts — infra entry.
  *
  * INFRA, not business. This file answers "how does the app boot?",
  * never "what is the app about?". Business config lives in
