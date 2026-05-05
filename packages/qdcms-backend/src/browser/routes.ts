@@ -1,26 +1,25 @@
 /**
- * The 6 routes (+ /plugins + /schema-state) hardcoded.
+ * In-browser HTTP dispatcher for the qdcms contract.
  *
- * Mirrors the qdcms HTTP contract from `@quazardous/qdcms-backend/http`
- * — but bare-bones, no router class, no validation, no error envelopes
- * beyond what the demo needs.
+ * Bare-bones counterpart to `src/http/router.ts` (the Node, MikroORM-
+ * backed version). Same routes — `/plugins`, `/schema-state`,
+ * `/entity/:name`, `/entity/:name/:id` — but resolved against the
+ * `MemoryStore` instead of a SQL connection. No router class, no
+ * MikroORM, no Node deps.
  */
 
-import type {
-  QdcmsRequest,
-  QdcmsResponse,
-} from '@quazardous/qdcms-backend/http'
-import type { DemoStore, Row } from './storage'
-import type { DemoPlugin } from './types'
+import type { QdcmsRequest, QdcmsResponse } from '../http/index'
+import type { MemoryStore, Row } from './MemoryStore'
+import type { BrowserPlugin } from './types'
 
-export interface DemoRouteContext {
-  store: DemoStore
-  plugins: DemoPlugin[]
+export interface BrowserRouteContext {
+  store: MemoryStore
+  plugins: BrowserPlugin[]
 }
 
-export async function dispatchDemo(
+export async function dispatchBrowser(
   req: QdcmsRequest,
-  ctx: DemoRouteContext,
+  ctx: BrowserRouteContext,
 ): Promise<QdcmsResponse> {
   // GET /plugins
   if (req.method === 'GET' && req.path === '/plugins') {
@@ -32,13 +31,13 @@ export async function dispatchDemo(
           version: p.version,
           prefix: p.prefix,
           title: p.title,
-          state: 'installed', // we pretend
+          state: 'installed',
         })),
       },
     }
   }
 
-  // GET /schema-state — empty per the spec we agreed on
+  // GET /schema-state — bare bones (browser variant doesn't run migrations)
   if (req.method === 'GET' && req.path === '/schema-state') {
     return { status: 200, body: {} }
   }
@@ -70,8 +69,8 @@ export async function dispatchDemo(
         return badRequest('POST /entity/:name requires an object body')
       }
       try {
-        const created = ctx.store.insert(entityName, req.body as Row)
-        return { status: 201, body: created }
+        const inserted = ctx.store.insert(entityName, req.body as Row)
+        return { status: 201, body: inserted }
       } catch (e) {
         return badRequest((e as Error).message)
       }
@@ -110,7 +109,7 @@ export async function dispatchDemo(
   return notFound(`unknown route ${req.method} ${req.path}`)
 }
 
-// ─── Tiny helpers ─────────────────────────────────────────────────────────
+// ─── helpers ──────────────────────────────────────────────────────────────
 
 function matchSegments(path: string, pattern: string[]): string[] | null {
   const segs = path.split('/')

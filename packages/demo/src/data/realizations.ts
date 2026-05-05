@@ -1,9 +1,9 @@
 // Realization entity shape — used as the typed payload for
 // useDemoCollection<Realization>() / useDemoEntity<Realization>().
 //
-// The data lives in the demo-backend (in-memory + localStorage) and is
-// served via the qdcms HTTP contract. This file just exports the type
-// + the seed array consumed at boot.
+// The data is seeded into the in-tab qdcms-backend (Map + localStorage)
+// when `install-demo-backend.ts` is imported, and served via the qdcms
+// HTTP contract. This file just exports the type + the seed array.
 
 export interface Realization {
   /** Primary key (logical id == slug — unique stable string). */

@@ -7,9 +7,10 @@ import type { Realization } from '../data/realizations'
 const props = defineProps<{ limit?: number; heading?: string; lead?: string }>()
 
 // useCollection issues a single GET /api/qdcms/entity/realization?limit=...
-// against the demo-backend (or a real qdcms backend, transparent).
-// `limit` becomes a query param; the composable handles loading/error
-// state and refreshes on entity:created / updated / deleted signals.
+// against whatever backend is active (in-tab via install-demo-backend or
+// a real Node server). `limit` becomes a query param; the composable
+// handles loading/error state and refreshes on entity created / updated
+// / deleted signals.
 const { items, loading } = useDemoCollection<Realization>('realization', {
   limit: props.limit ?? 100,
 })
