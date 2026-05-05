@@ -97,3 +97,28 @@ export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: built.routes,
 })
+
+/**
+ * Append slug entries to the live slug table and the router after they
+ * were built — used by additive zones (admin, plugin areas) imported
+ * as side-effect modules from `main.ts`.
+ *
+ * Why it works after the router is already created:
+ *   • `createPrefixUrlBuilder` captures the slug table by reference and
+ *     re-reads it on every call, so pushing into the same array is
+ *     enough to make `buildUrl(locale, name)` resolve the new entries.
+ *   • `router.addRoute()` registers extra paths after construction;
+ *     vue-router's matcher prioritises by path specificity, so the
+ *     locale-prefixed admin paths win over the catch-all without
+ *     having to reorder anything.
+ */
+export function extendRouter(entries: SlugTable): void {
+  for (const entry of entries) slugTable.push(entry)
+  const extra = buildRoutes(entries, {
+    locales: LOCALES,
+    defaultLocale: DEFAULT_LOCALE,
+    rootRedirect: false,
+    appendCatchAll: false,
+  })
+  for (const route of extra.routes) router.addRoute(route)
+}
