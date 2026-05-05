@@ -25,6 +25,12 @@ import {
   type DiscoveredPlugin,
   type LoadFromNodeModulesResult,
 } from './loader/NodeModulesPluginLoader'
+import {
+  buildRouter,
+  dispatch,
+  type QdcmsRequest,
+  type QdcmsResponse,
+} from './http/index'
 
 export interface CreateBackendOptions {
   /**
@@ -65,6 +71,16 @@ export interface QdcmsBackend {
   discovered: DiscoveredPlugin[]
   /** Per-package errors surfaced during discovery (non-fatal). */
   loaderErrors: LoadFromNodeModulesResult['errors']
+  /**
+   * Framework-agnostic HTTP entry point. Consumers wrap with their
+   * preferred framework (Express/Fastify/Hono/native http) or with the
+   * future qdcms-api-emulator (browser fetch interceptor).
+   *
+   * The path is the qdcms route WITHOUT the `/api/qdcms` prefix —
+   * e.g. `/plugins`, `/entity/user/abc`. The wrapper strips the
+   * prefix before calling.
+   */
+  handle(req: QdcmsRequest): Promise<QdcmsResponse>
   /** Tear down: closes the storage connection. */
   shutdown(): Promise<void>
 }
@@ -113,6 +129,10 @@ export async function createBackend(
     }
   }
 
+  // Build the HTTP router once; reused by every handle() call.
+  const router = buildRouter()
+  const backendHandlerCtx = { registry, storage, store, runner }
+
   return {
     registry,
     storage,
@@ -120,6 +140,7 @@ export async function createBackend(
     runner,
     discovered: plugins,
     loaderErrors: errors,
+    handle: (req) => dispatch(router, backendHandlerCtx, req),
     async shutdown() {
       try {
         await storage.disconnect()

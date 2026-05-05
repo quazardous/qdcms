@@ -17,3 +17,4 @@ export {
 } from './createBackend'
 
 export * from './loader/index'
+export * from './http/index'
