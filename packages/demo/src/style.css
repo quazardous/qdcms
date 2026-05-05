@@ -1,5 +1,10 @@
-@import 'open-props/style';
-@import 'open-props/normalize';
+/* Open-props in low-priority layer so PrimeVue / qdadm (unlayered)
+ * always beats their global resets in the admin zone. The CSS
+ * variables (`--size-*`, `--font-*`, etc.) stay globally accessible
+ * — layers only affect rule cascade, not custom-property inheritance.
+ */
+@import 'open-props/style' layer(qcms-tokens);
+@import 'open-props/normalize' layer(qcms-tokens);
 
 /* ───────────────────────────────────────────────────────────────────
    Flower Craft — theme tokens
@@ -26,8 +31,19 @@
   --shadow-lift: 0 2px 6px rgb(0 0 0 / 0.06), 0 18px 40px rgb(0 0 0 / 0.08);
 }
 
-/* ─── Reset overrides ─────────────────────────────────────────── */
-html, body {
+/* ─── Reset overrides ─────────────────────────────────────────────────
+ * All element-selector rules below are scoped to `body.qcms-zone` so
+ * they don't bleed into the admin zone where qdadm + PrimeVue/Aura
+ * own the visual chrome. The body class is toggled by App.vue on
+ * every route change (`/admin/*` → `qdadm-zone`, else `qcms-zone`).
+ *
+ * Keep `* { box-sizing: border-box }` global — harmless and expected
+ * by both zones.
+ * ──────────────────────────────────────────────────────────────────── */
+
+* { box-sizing: border-box; }
+
+body.qcms-zone {
   background: var(--brand-cream);
   color: var(--brand-ink);
   font-family: var(--sans);
@@ -37,16 +53,17 @@ html, body {
   accent-color: var(--brand-deep);
 }
 
-* { box-sizing: border-box; }
-
-a {
+.qcms-zone a {
   color: var(--brand-deep);
   text-decoration: none;
   transition: color 120ms ease;
 }
-a:hover { color: var(--brand-warm); }
+.qcms-zone a:hover { color: var(--brand-warm); }
 
-h1, h2, h3, h4 {
+.qcms-zone h1,
+.qcms-zone h2,
+.qcms-zone h3,
+.qcms-zone h4 {
   font-family: var(--serif);
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -54,13 +71,13 @@ h1, h2, h3, h4 {
   line-height: 1.15;
   margin: 0 0 0.6em;
 }
-h1 { font-size: clamp(2rem, 4.5vw, 3.4rem); font-weight: 600; }
-h2 { font-size: clamp(1.5rem, 2.8vw, 2.1rem); }
-h3 { font-size: 1.25rem; font-weight: 600; }
+.qcms-zone h1 { font-size: clamp(2rem, 4.5vw, 3.4rem); font-weight: 600; }
+.qcms-zone h2 { font-size: clamp(1.5rem, 2.8vw, 2.1rem); }
+.qcms-zone h3 { font-size: 1.25rem; font-weight: 600; }
 
-p { margin: 0 0 1rem; }
+.qcms-zone p { margin: 0 0 1rem; }
 
-button {
+.qcms-zone button {
   font-family: var(--sans);
 }
 

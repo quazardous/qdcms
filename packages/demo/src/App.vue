@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, shallowRef, type Component } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef, type Component } from 'vue'
 import { LangSwitcher, bindRouter, declaredStackBuilder, useCms, withLocale } from 'qdcms'
 import { useRouter } from 'vue-router'
 import { DebugBar, type CollectorMeta, type DebugBridge } from '@quazardous/qddebug'
@@ -29,18 +29,42 @@ const debugMeta: Record<string, CollectorMeta> = {
 const router = useRouter()
 const cms = useCms()
 const bridge = shallowRef<DebugBridge | null>(null)
+const isAdmin = ref(false)
+// Show qcms's qddebug bar only on the front. On /admin, qdadm's own
+// debug bar (via QdadmRoot) takes over with admin-specific panels
+// (Toast, Zones, Auth, Entities, Router, I18n) — both bars use the
+// same @quazardous/qddebug renderer so they'd visually stack if both
+// were rendered at once.
+const showQcmsDebug = computed(() => !!bridge.value && !isAdmin.value)
+
+// Zone class on <body>. CSS in style.css scopes its element-selector
+// rules (a, h1-h4, button, body bg/font) to `.qcms-zone` so they
+// don't bleed into qdadm-rendered admin pages where PrimeVue / Aura
+// owns the visual chrome. Toggling on every route change keeps the
+// switch instant when navigating between zones.
+function syncZone(path: string): void {
+  const adm = path.startsWith('/admin')
+  isAdmin.value = adm
+  document.body.classList.toggle('qdadm-zone', adm)
+  document.body.classList.toggle('qcms-zone', !adm)
+}
 
 let stopRouter: (() => void) | null = null
+let stopRouteWatch: (() => void) | null = null
 onMounted(() => {
   stopRouter = bindRouter(router, cms, { stackBuilder: withLocale(declaredStackBuilder) })
+  stopRouteWatch = router.afterEach((to) => syncZone(to.path))
+  syncZone(router.currentRoute.value.path)
   if (import.meta.env.DEV) {
     bridge.value = createDemoDebug(cms)
   }
 })
 onUnmounted(() => {
   stopRouter?.()
+  stopRouteWatch?.()
   bridge.value?.uninstall()
   bridge.value = null
+  document.body.classList.remove('qcms-zone', 'qdadm-zone')
 })
 </script>
 
@@ -54,12 +78,15 @@ onUnmounted(() => {
     <LangSwitcher :locales="LOCALES" :build-url="buildUrl" variant="dropdown" />
   </div>
 
-  <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
-  <DebugBar v-if="bridge" :bridge="(bridge as any)" :panels="(debugPanels as any)" :collector-meta="debugMeta" />
+  <!-- qcms's debug bar — front zone only. eslint-disable-next-line @typescript-eslint/no-explicit-any -->
+  <DebugBar v-if="showQcmsDebug" :bridge="(bridge as any)" :panels="(debugPanels as any)" :collector-meta="debugMeta" />
 
-  <!-- qdadm extras: Toast / ToastListener / qdadm debug bar. No-op
-       when the corresponding qdadm options aren't configured. -->
-  <QdadmRoot />
+  <!-- qdadm extras: Toast / ToastListener / qdadm debug bar. Mounted
+       only on /admin so the qdadm debug bar (which uses the same
+       @quazardous/qddebug renderer as qcms's) doesn't stack with the
+       qcms one on the front. The qdadm bar carries admin-specific
+       panels (Toast, Zones, Auth, Entities, Router, I18n). -->
+  <QdadmRoot v-if="isAdmin" />
 </template>
 
 <style scoped>
