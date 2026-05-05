@@ -4,6 +4,7 @@ import App from './App.vue'
 import { router, buildUrl } from './router'
 import { cms } from './cms'
 import { createDemoBackend } from './demo-backend'
+import { realizationSeed } from './data/realizations'
 import './style.css'
 
 // Register the URL builder before mounting so any block rendered on first
@@ -26,6 +27,17 @@ const demoBackend = createDemoBackend({
       title: 'Core',
       tables: ['user', 'session'],
     },
+    // Demo-only "plugin" — exposes the realization entity that the
+    // demo's portfolio blocks consume. In a real deployment this
+    // would be a proper qdcms plugin npm package; for the demo it's
+    // declared inline.
+    {
+      id: 'demo',
+      version: '0.1.0',
+      prefix: 'demo',
+      title: 'Demo content',
+      tables: ['realization'],
+    },
   ],
   seed: {
     user: [
@@ -37,6 +49,7 @@ const demoBackend = createDemoBackend({
         updated_at: '2026-01-01T00:00:00Z',
       },
     ],
+    realization: realizationSeed,
   },
   // localStorage by default — survives reload + browser restart
 })

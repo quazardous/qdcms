@@ -1,10 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { LocaleLink } from 'qdcms'
-import { findRealization } from '../data/realizations'
+import { useDemoEntity } from '../services'
+import type { Realization } from '../data/realizations'
 
 const props = defineProps<{ slug?: string | null }>()
-const realization = computed(() => findRealization(props.slug))
+
+// id == slug for realizations (see realizationSeed). Passing a
+// computed ref so useEntity refetches automatically when the route
+// slug changes (e.g. user navigates to a different realization).
+const id = computed<string | number | null>(() => props.slug ?? null)
+const { data: realization, loading } = useDemoEntity<Realization>(
+  'realization',
+  id,
+)
 </script>
 
 <template>
@@ -20,6 +29,9 @@ const realization = computed(() => findRealization(props.slug))
     </div>
     <div class="realization__body" style="white-space: pre-line;">{{ realization.body }}</div>
   </article>
+  <div v-else-if="loading">
+    <p>Chargement…</p>
+  </div>
   <div v-else>
     <p>Réalisation introuvable. <LocaleLink name="realisations">Toutes les réalisations</LocaleLink></p>
   </div>

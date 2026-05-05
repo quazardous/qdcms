@@ -1,7 +1,14 @@
-// Mock data — in real app a block fetches via API or qdadm EntityManager.
-// Unsplash URLs (stable IDs) — no local image assets.
+// Realization entity shape — used as the typed payload for
+// useDemoCollection<Realization>() / useDemoEntity<Realization>().
+//
+// The data lives in the demo-backend (in-memory + localStorage) and is
+// served via the qdcms HTTP contract. This file just exports the type
+// + the seed array consumed at boot.
 
 export interface Realization {
+  /** Primary key (logical id == slug — unique stable string). */
+  id: string
+  /** URL slug. Same value as id; kept for readability in templates. */
   slug: string
   title: string
   type: 'mariage' | 'événement' | 'installation' | 'éditorial'
@@ -15,8 +22,9 @@ export interface Realization {
 const u = (id: string, w = 1600) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=80`
 
-export const realizations: Realization[] = [
+export const realizationSeed: Realization[] = [
   {
+    id: 'mariage-juliette-thomas',
     slug: 'mariage-juliette-thomas',
     title: 'Juliette & Thomas — domaine de Castille',
     type: 'mariage',
@@ -30,6 +38,7 @@ et de roses anciennes du jardin de Marie. Centres de table en compositions
 asymétriques, basses pour ne jamais couper la conversation.`,
   },
   {
+    id: 'centre-ophelia',
     slug: 'centre-ophelia',
     title: 'Boutique Ophélia — installation saisonnière',
     type: 'installation',
@@ -42,6 +51,7 @@ graminées sèches et physalis. L'installation tient 6 semaines
 sans entretien — choix volontaire de fleurs séchées issues de notre stock été.`,
   },
   {
+    id: 'lancement-livre-marais',
     slug: 'lancement-livre-marais',
     title: 'Lancement « Le Marais en quatre saisons »',
     type: 'événement',
@@ -54,6 +64,7 @@ Trois compositions miroirs des chapitres : printemps glycine,
 été lavande, automne dahlia. Tout a été composé la veille, en direct.`,
   },
   {
+    id: 'editorial-vogue-fr',
     slug: 'editorial-vogue-fr',
     title: 'Éditorial — Vogue France · numéro printemps',
     type: 'éditorial',
@@ -65,6 +76,7 @@ graphique, peu de variétés, beaucoup d'air. Toutes les fleurs viennent
 des serres bio des Pyrénées.`,
   },
   {
+    id: 'mariage-elena-paulin',
     slug: 'mariage-elena-paulin',
     title: 'Elena & Paulin — chai de Léognan',
     type: 'mariage',
@@ -77,6 +89,7 @@ suspendue de glycine, lavande, romarin. Bouquet de la mariée tenu
 volontairement asymétrique, presque champêtre.`,
   },
   {
+    id: 'inauguration-cafe-bregon',
     slug: 'inauguration-cafe-bregon',
     title: 'Inauguration du café Brégon',
     type: 'événement',
@@ -89,8 +102,3 @@ sur chaque table, fleurs locales et de saison uniquement.
 Toutes les compositions ont été redistribuées aux invités à la fin.`,
   },
 ]
-
-export function findRealization(slug: string | null | undefined): Realization | null {
-  if (!slug) return null
-  return realizations.find((r) => r.slug === slug) ?? null
-}

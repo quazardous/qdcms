@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { LocaleLink } from 'qdcms'
-import { realizations } from '../data/realizations'
+import { useDemoCollection } from '../services'
+import type { Realization } from '../data/realizations'
 
 const props = defineProps<{ limit?: number; heading?: string; lead?: string }>()
 
-const items = computed(() => realizations.slice(0, props.limit ?? 100))
+// useCollection issues a single GET /api/qdcms/entity/realization?limit=...
+// against the demo-backend (or a real qdcms backend, transparent).
+// `limit` becomes a query param; the composable handles loading/error
+// state and refreshes on entity:created / updated / deleted signals.
+const { items, loading } = useDemoCollection<Realization>('realization', {
+  limit: props.limit ?? 100,
+})
+
+const ready = computed(() => !loading.value && items.value.length > 0)
 </script>
 
 <template>
@@ -17,10 +26,12 @@ const items = computed(() => realizations.slice(0, props.limit ?? 100))
       </div>
       <p v-if="lead" class="portfolio__lead">{{ lead }}</p>
     </div>
-    <div class="portfolio__grid">
+    <div v-if="loading" class="portfolio__loading">Chargement…</div>
+    <div v-else-if="!ready" class="portfolio__empty">Aucune réalisation à afficher.</div>
+    <div v-else class="portfolio__grid">
       <LocaleLink
         v-for="r in items"
-        :key="r.slug"
+        :key="r.id"
         name="realisation"
         :params="{ slug: r.slug }"
         class="portfolio-card"

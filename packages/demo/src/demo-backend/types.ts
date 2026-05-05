@@ -25,10 +25,15 @@ export interface DemoPlugin {
 }
 
 /**
- * Initial data per logical entity name. Each row is a flat object;
- * an `id` field is required (the mock uses it as the primary key).
+ * Initial data per logical entity name.
+ *
+ * Each row MUST carry an `id` field at runtime (the mock uses it as
+ * the primary key) — this is checked when seeding. The compile-time
+ * type is `unknown[]` to avoid TypeScript's index-signature
+ * compatibility headaches: named interfaces (e.g. `Realization`) and
+ * inline object literals with extra fields both assign cleanly.
  */
-export type DemoSeed = Record<string, Array<{ id: string | number; [k: string]: unknown }>>
+export type DemoSeed = Record<string, ReadonlyArray<unknown>>;
 
 export interface CreateDemoBackendOptions {
   plugins: DemoPlugin[]

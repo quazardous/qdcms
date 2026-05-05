@@ -120,7 +120,19 @@ export class DemoStore {
       const table = this.tableByLogicalName.get(logicalName)
       if (!table) continue // ignore seeds for unknown entities
       out[table] ??= {}
-      for (const row of rows) {
+      for (const raw of rows) {
+        // Runtime check (DemoSeed is typed as unknown[] for ergonomics).
+        if (!raw || typeof raw !== 'object') {
+          throw new Error(
+            `demo-backend: seed for "${logicalName}" must contain objects`,
+          )
+        }
+        const row = raw as Row & { id?: unknown }
+        if (typeof row.id !== 'string' && typeof row.id !== 'number') {
+          throw new Error(
+            `demo-backend: seed for "${logicalName}" has a row without a string/number "id" field`,
+          )
+        }
         out[table][String(row.id)] = { ...row }
       }
     }
