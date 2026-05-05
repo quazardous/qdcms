@@ -1,26 +1,18 @@
 /**
- * Bootstrap the qdcms demo debug bridge.
+ * Register qcms-side debug collectors on the shared bridge.
  *
- * Registers:
- * - ErrorCollector / SignalCollector (generic, from qddebug)
- * - CmsContextCollector / ComposedPageCollector (qdcms-specific, in this folder)
- *
- * Returns the `bridge` ready to be passed to `<DebugBar :bridge>`.
+ * qdadm's DebugModule already provides Errors / Signals / Toasts /
+ * Zones / Auth / Entities / Router / i18n. qcms only contributes its
+ * own ones: cms-context (current Cms snapshot) and composed-page
+ * (last composed page from the composer). No install — the host
+ * shell installs the bridge once with a merged context.
  */
-import { createDebugBridge, ErrorCollector, SignalCollector } from '@quazardous/qddebug'
+import type { DebugBridge } from '@quazardous/qddebug'
 import type { Cms } from 'qdcms'
 import { CmsContextCollector } from './CmsContextCollector'
 import { ComposedPageCollector } from './ComposedPageCollector'
 
-export function createDemoDebug(cms: Cms): ReturnType<typeof createDebugBridge> {
-  const bridge = createDebugBridge({ enabled: true })
-
-  bridge.addCollector(new ErrorCollector({ maxEntries: 50 }))
-  bridge.addCollector(new SignalCollector({ maxEntries: 100 }))
+export function addQcmsCollectors(bridge: DebugBridge, _cms: Cms): void {
   bridge.addCollector(new CmsContextCollector())
   bridge.addCollector(new ComposedPageCollector())
-
-  bridge.install({ signals: cms.signals, cms })
-
-  return bridge
 }

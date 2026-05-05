@@ -23,5 +23,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <QdadmRoot />
+  <!-- :debug-bar="false" → the unified <DebugBar /> lives in App.vue
+       and reads the shared bridge. QdadmRoot still mounts Toast +
+       ToastListener (admin-only PrimeVue chrome). -->
+  <QdadmRoot :debug-bar="false" />
 </template>

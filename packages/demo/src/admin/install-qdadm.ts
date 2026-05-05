@@ -32,6 +32,7 @@ import 'qdadm/styles'
 import 'primeicons/primeicons.css'
 
 import { signals } from '../shell/signals'
+import { debugBridge } from '../shell/debugBridge'
 import { router } from '../router'
 import AdminHome from './pages/AdminHome.vue'
 
@@ -41,7 +42,7 @@ import AdminHome from './pages/AdminHome.vue'
 // sees two distinct types. Cast the whole options object once via
 // `unknown` — runtime is fine, the cast is a known type-only mismatch.
 
-export function installQdadm(app: App): void {
+export function installQdadm(app: App): Kernel {
   const options: KernelOptions = {
     // Host injection — Kernel reuses these instead of creating its own.
     existingApp: app as unknown as KernelOptions['existingApp'],
@@ -63,8 +64,14 @@ export function installQdadm(app: App): void {
 
     primevue: { plugin: PrimeVue, theme: Aura },
 
-    // Auto-injects DebugModule + sets up the qdadm debug bar.
-    debugBar: debugBar as KernelOptions['debugBar'],
+    // Auto-injects DebugModule. The `bridge` field tells the module
+    // to register its collectors onto the host's shared bridge instead
+    // of creating its own — the demo renders ONE unified <DebugBar />
+    // covering both qcms and qdadm panels.
+    debugBar: {
+      ...debugBar,
+      bridge: debugBridge,
+    } as unknown as KernelOptions['debugBar'],
     notifications: { enabled: true, maxNotifications: 100 },
 
     features: {
@@ -81,4 +88,5 @@ export function installQdadm(app: App): void {
   // modules, plugins) on the existing app and returns it. We don't
   // mount — the host shell does that.
   kernel.createApp()
+  return kernel
 }

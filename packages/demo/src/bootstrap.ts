@@ -21,6 +21,8 @@ import { router, buildUrl } from './router'
 import { cms } from './cms-instance'
 import './cms' // side-effect: registers blocks/layouts/placements
 import { installQdadm } from './admin/install-qdadm'
+import { debugBridge } from './shell/debugBridge'
+import { addQcmsCollectors } from './debug/createDebug'
 
 export interface BootstrapInput {
   /** Root component. main.ts decides which one (front / admin / shell). */
@@ -39,8 +41,43 @@ export async function bootstrapApp({ App }: BootstrapInput): Promise<VueApp> {
 
   // Plug qdadm onto the same Vue app — it shares our router and
   // SignalBus (via Orchestrator), so admin and front zones see the
-  // same events and navigate the same router.
-  installQdadm(app)
+  // same events and navigate the same router. The Kernel also
+  // registers qdadm's debug collectors on the SHARED `debugBridge`
+  // (via the `debugBar.bridge` option), but doesn't install — the
+  // host shell installs once below with a merged context.
+  const kernel = installQdadm(app) as unknown as {
+    zoneRegistry?: unknown
+    activeStack?: unknown
+    stackHydrator?: unknown
+    i18nInstance?: unknown
+    hookRegistry?: unknown
+    orchestrator?: unknown
+  }
+
+  // qcms collectors register on the same shared bridge — ensures
+  // ONE <DebugBar /> can render both qcms and qdadm panels.
+  if (import.meta.env.DEV) {
+    addQcmsCollectors(debugBridge, cms)
+  }
+
+  // Single install with a merged context covering everything any
+  // collector might need: signals (qcms+qdadm), cms (qcms collectors),
+  // router (Zones / Router collectors), zones / activeStack /
+  // stackHydrator / i18n / hooks (qdadm collectors). Each collector
+  // picks what it needs and ignores the rest.
+  if (import.meta.env.DEV) {
+    debugBridge.install({
+      signals: cms.signals,
+      cms,
+      router,
+      zones: kernel.zoneRegistry,
+      activeStack: kernel.activeStack,
+      stackHydrator: kernel.stackHydrator,
+      i18n: kernel.i18nInstance,
+      hooks: kernel.hookRegistry,
+      orchestrator: kernel.orchestrator,
+    })
+  }
 
   // qdadm's Kernel adds its `/admin/*` routes via `addRoute()` AFTER
   // `app.use(router)` already registered the qdcms-side routes. The
