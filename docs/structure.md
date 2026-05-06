@@ -631,7 +631,7 @@ mon-site/
 
 - **YAML files in `config/`** — the **static, declarative** truth.
   Most of the site's configuration lives here.
-  Compiled into `config/.compiled/` and loaded automatically by
+  Compiled into `.compiled/config/` and loaded automatically by
   the shell — **the user never imports it**. That's internal
   plumbing.
 - **`qdcms.config.ts` (optional)** — escape hatch for **dynamic
@@ -677,8 +677,8 @@ The split is strict :
 - **Build time** — a small CLI (shell-provided) walks
   `config/*.yaml`, validates each file against its schema
   (defined by the framework or by plugins), emits typed TS in
-  `config/.compiled/`.
-- **Runtime** — the shell reads only `config/.compiled/`. **No
+  `.compiled/config/`.
+- **Runtime** — the shell reads only `.compiled/config/`. **No
   YAML parser ever ships in the bundle.** No validation overhead
   at boot. The runtime artifact is plain TS modules (or JSON)
   that Vite / Node load like any other source.
@@ -757,7 +757,7 @@ than as cryptic runtime failures.
 | Layer                                  | Storage                                       |
 |---|---|
 | Committed source of truth              | `<instance>/config/*.yaml`                    |
-| Compiled artefact (runtime input)      | `<instance>/config/.compiled/*.ts`            |
+| Compiled artefact (runtime input)      | `<instance>/.compiled/config/*.ts`            |
 | Live admin-edited overrides            | DB rows (`qdcms_config_live`)                 |
 | Plugin install templates               | `<plugin>/config/install/*.yaml`              |
 

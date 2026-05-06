@@ -15,8 +15,8 @@
  * without touching call sites.
  */
 
-import qdcmsLocales from './.compiled/qdcms.locales'
-import qdcmsPlugins from './.compiled/qdcms.plugins'
+import qdcmsLocales from '../.compiled/config/qdcms.locales'
+import qdcmsPlugins from '../.compiled/config/qdcms.plugins'
 import { seed } from './seed'
 import type { Locale } from 'qdcms'
 import type { BrowserPlugin, BrowserSeed } from '@quazardous/qdcms-backend/browser'

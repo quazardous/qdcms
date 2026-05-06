@@ -6,8 +6,21 @@
  */
 
 import { Args, Command, Flags } from '@oclif/core'
-import { resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { compileConfig } from '@quazardous/qdcms-core/config'
+
+/**
+ * Default compiled-output location follows the umbrella
+ * convention : `<instance-umbrella>/.compiled/<input-basename>/`.
+ * Example: `demo/config` → `demo/.compiled/config/`.
+ *
+ * `.compiled/` at the umbrella level is generic — other
+ * compilation outputs (plugin schemas, content, …) can sit
+ * alongside `config/` there.
+ */
+function defaultOutDir(instanceDir: string): string {
+  return join(dirname(instanceDir), '.compiled', basename(instanceDir))
+}
 
 export default class ConfigCompile extends Command {
   static override description =
@@ -48,7 +61,7 @@ export default class ConfigCompile extends Command {
     const instanceDir = resolve(
       flags.instance ?? args.instance ?? './config',
     )
-    const outDir = flags.out ? resolve(flags.out) : undefined
+    const outDir = flags.out ? resolve(flags.out) : defaultOutDir(instanceDir)
 
     const t0 = performance.now()
     const result = await compileConfig({ instanceDir, outDir })

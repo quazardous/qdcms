@@ -13,8 +13,12 @@
  */
 
 import { Args, Command, Flags } from '@oclif/core'
-import { resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { compileConfig } from '@quazardous/qdcms-core/config'
+
+function defaultOutDir(instanceDir: string): string {
+  return join(dirname(instanceDir), '.compiled', basename(instanceDir))
+}
 
 export default class ConfigDoctor extends Command {
   static override description =
@@ -52,16 +56,18 @@ export default class ConfigDoctor extends Command {
     const instanceDir = resolve(
       flags.instance ?? args.instance ?? './config',
     )
+    const outDir = defaultOutDir(instanceDir)
 
     const t0 = performance.now()
     let result
     try {
       result = await compileConfig({
         instanceDir,
-        // Doctor defaults to noCache:true unless user asks for cached run.
-        // Cache hits skip validation, so they'd bypass the very thing
-        // doctor exists to check. CI gates always want fresh data.
-        noCache: !flags['no-cache'] ? true : true,
+        outDir,
+        // Doctor forces noCache so cache hits don't mask the very
+        // warnings doctor exists to surface. CI gates always want
+        // fresh data.
+        noCache: true,
       })
     } catch (e) {
       const elapsed = Math.round(performance.now() - t0)

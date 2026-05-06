@@ -6,5 +6,9 @@ dist
 coverage
 demo/data/*.sqlite
 demo/data/*.sqlite-journal
-demo/config/.compiled
+sandbox/demo/data/*.sqlite
+sandbox/demo/data/*.sqlite-journal
+demo/.compiled
+sandbox/demo/.compiled/*
+!sandbox/demo/.compiled/.gitkeep
 .env.local

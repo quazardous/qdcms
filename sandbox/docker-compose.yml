@@ -1,7 +1,35 @@
 # sandbox/docker-compose.yml — qdcms reproducible env.
 #
-# One service today (qdcms) ; future services (db, mailcatcher…)
-# slot in alongside without touching the Makefile API.
+# Volume principle : code is SHARED with the host (mounted), state
+# is ISOLATED (sandbox-specific). The two worlds from structure.md
+# materialise as two distinct mount points :
+#
+#  - /core   = the qdcms repo (framework, packages, tooling)
+#  - /demo   = the demo instance (its own world, pointed at /demo)
+#  - /qdadm  = sibling qdadm repo (file: workspace deps target)
+#
+# Isolated state — host stays untouched even with the sandbox
+# running :
+#  - /demo/data       ← bound from sandbox/demo/data
+#  - /demo/.compiled  ← bound from sandbox/demo/.compiled
+#
+# Note on /core/demo : the host's qdcms repo carries `demo/` as a
+# workspace sub-folder for dev convenience (one `npm install`
+# wires both qdcms packages and the demo). This means /core/demo
+# is visible inside the container as a side effect of the
+# `..:/core` bind mount — it's NOT a deliberate cross-world
+# coupling. The sandbox's CLI and Makefile address the demo via
+# /demo only ; treat /core/demo as "exists for npm workspace
+# resolution, do not reference". A future slice will pull the
+# demo out of the repo's workspaces array so this leak
+# disappears.
+#
+# Future hook : a config overlay (sandbox-specific YAML
+# overriding the demo's config) would slot in here as additional
+# bind mounts at /demo/config/<file>.yaml. Defer until needed.
+#
+# node_modules live in named docker volumes — never share host's,
+# because native modules (better-sqlite3) compile per arch.
 
 services:
   qdcms:
@@ -10,33 +38,39 @@ services:
       dockerfile: Dockerfile
     image: qdcms-sandbox:dev
     container_name: qdcms-sandbox
-    # Mount the repo at /workspace so edits flow both ways.
     volumes:
-      - ../:/workspace
-      # Keep node_modules inside the container ; if the host has
-      # a different OS / arch, native modules (better-sqlite3)
-      # would break otherwise. Per-package node_modules are
-      # captured by named volumes.
-      - qdcms-node-modules-root:/workspace/node_modules
-      - qdcms-node-modules-frontend:/workspace/demo/frontend/node_modules
-      - qdcms-node-modules-backend:/workspace/demo/backend/node_modules
-    working_dir: /workspace
-    # Frontend dev port (Vite) + backend dev port (Express).
-    # Override via SANDBOX_FRONTEND_PORT / SANDBOX_BACKEND_PORT
-    # in the Makefile if these clash with your host.
+      # qdcms repo (= the core).
+      - ../:/core
+      # qdadm sibling repo — needed for the demo's file: workspace
+      # deps to resolve in-container. The path layout matches the
+      # host (qdcms and qdadm as siblings) so npm's relative
+      # symlinks Just Work.
+      - ../../qdadm:/qdadm
+      # The demo instance at /demo (the other world).
+      - ../demo:/demo
+      # Sandbox-isolated state : data + compiled artefacts go to
+      # the sandbox's own folders, decoupled from the host's
+      # local state. Addressed via /demo (not /core/demo — that
+      # path exists incidentally, see comment block above).
+      - ./demo/data:/demo/data
+      - ./demo/.compiled:/demo/.compiled
+      # node_modules per workspace (cross-arch isolation).
+      - qdcms-node-modules-root:/core/node_modules
+      - qdcms-node-modules-frontend:/core/demo/frontend/node_modules
+      - qdcms-node-modules-backend:/core/demo/backend/node_modules
+      - qdadm-node-modules:/qdadm/node_modules
+    working_dir: /core
     ports:
       - '${SANDBOX_FRONTEND_PORT:-5180}:5180'
       - '${SANDBOX_BACKEND_PORT:-5181}:5181'
     environment:
       - NODE_ENV=development
-      # Force the qdcms host root to /workspace so the plugin
-      # walker doesn't get confused by the volume layering.
-      - QDCMS_CORE=/workspace
-    # `tail -f /dev/null` keeps the container alive ; the
-    # Makefile uses `docker compose exec` for everything actual.
+      # The qdcms framework root inside the container.
+      - QDCMS_CORE=/core
     command: ['tail', '-f', '/dev/null']
 
 volumes:
   qdcms-node-modules-root:
   qdcms-node-modules-frontend:
   qdcms-node-modules-backend:
+  qdadm-node-modules:

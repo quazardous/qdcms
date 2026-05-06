@@ -60,8 +60,9 @@ demo/                                  ← instance umbrella
 │   ├── qdcms.slug-table.yaml          ← framework: page-types & slug routing (until page-types plugin extracts it)
 │   ├── plugin-core.users.yaml         ← qdcms-plugin-core's instance-side config
 │   ├── plugin-dc.types.yaml           ← qdcms-plugin-dc, copied on install
-│   ├── plugin-menus.tree.yaml         ← qdcms-plugin-menus, idem
-│   └── .compiled/                     ← generated, gitignored
+│   └── plugin-menus.tree.yaml         ← qdcms-plugin-menus, idem
+├── .compiled/                         ← TRANSVERSAL, generic — generated, gitignored
+│   └── config/                        ← compiled config artefacts
 │       ├── index.ts
 │       ├── qdcms.plugins.ts
 │       ├── plugin-dc.types.ts
@@ -72,6 +73,11 @@ demo/                                  ← instance umbrella
 ├── frontend/                          ← SPA-only
 └── backend/                           ← Server-only
 ```
+
+The `.compiled/` directory sits at the instance umbrella level
+(not nested inside `config/`) so other compilation outputs —
+plugin schemas, content snapshots, future build artefacts —
+share the same location, each in their own subfolder.
 
 ### 2.2 Plugin side (under QDCMS_CORE)
 
@@ -462,7 +468,7 @@ validators**. Both ship in dev / build dependencies only.
    emit .compiled/                  (typed TS modules — final merged values)
 ```
 
-The output is plain TS modules under `<instance>/config/.compiled/`,
+The output is plain TS modules under `<instance>/.compiled/config/`,
 one per file (so `plugin-dc.types.yaml` →
 `.compiled/plugin-dc.types.ts`). Plus an aggregator
 `.compiled/index.ts` re-exporting everything :
@@ -639,7 +645,7 @@ Two flows :
 
 ### 8.1 Read at boot
 
-1. Boot loads `<instance>/config/.compiled/index.ts` (the static
+1. Boot loads `<instance>/.compiled/config/index.ts` (the static
    state).
 2. Boot loads `qdcms_config_live` rows from the DB (overrides
    coming from admin edits since last export).
@@ -669,7 +675,7 @@ The config layer separates four concerns deliberately :
 | Plugin schemas (validation + types)    | `packages/<plugin>/config/schemas/*.ts`              |
 | Instance source of truth (committed)   | `<instance>/config/*.yaml`                          |
 | Live admin-edited state                | `qdcms_config_live` rows in the DB                  |
-| Compile-time merge of all of the above | `<instance>/config/.compiled/*.ts`                  |
+| Compile-time merge of all of the above | `<instance>/.compiled/config/*.ts`                  |
 
 Operator surface (the qdcms CLI, see `cli.md`) :
 `qdcms config:compile`, `:export`, `:import`, `:status`,
