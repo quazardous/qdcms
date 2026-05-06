@@ -8,8 +8,6 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "type-check": "npm run type-check --workspaces --if-present",
-    "dedup": "bash scripts/dedup-qdadm-vue.sh",
-    "postinstall": "bash scripts/dedup-qdadm-vue.sh || true"
+    "type-check": "npm run type-check --workspaces --if-present"
   }
 }

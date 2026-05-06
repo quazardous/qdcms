@@ -106,8 +106,7 @@ qdcms/                                 ← repo root (umbrella ; no package.json
 │   ├── structure.md                   ← this file
 │   ├── config.md                      ← config-as-code spec
 │   ├── cli.md                         ← qdcms CLI design (oclif-based)
-│   ├── instance-anatomy.md            ← how an instance is shaped
-│   └── qdadm-vue-dedup.md             ← cross-repo dev note
+│   └── instance-anatomy.md            ← how an instance is shaped
 ├── sandbox/                           ← reproducible Docker env
 │   ├── README.md
 │   ├── Makefile                       ← `make help` lists every target

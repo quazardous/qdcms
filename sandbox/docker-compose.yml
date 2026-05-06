@@ -53,13 +53,6 @@ services:
       - ../demo:/demo
       - ./demo/data:/demo/data
       - ./demo/.compiled:/demo/.compiled
-      # Note on node_modules : we share the host's via the bind
-      # mounts above (no named volumes). Container runs as the
-      # host user so writes go through, and on linux-x64 the
-      # native modules (better-sqlite3) match the host's.
-      # If you ever sandbox on a different arch, switch back
-      # to named volumes + an init container that chowns them
-      # to ${UID}:${GID} at first run.
     working_dir: /demo
     # Direct port mapping kept for non-Traefik access (curl, CI).
     ports:

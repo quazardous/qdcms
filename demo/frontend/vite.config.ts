@@ -23,7 +23,12 @@ export default defineConfig({
   publicDir: resolve(here, '..', 'public'),
   plugins: [vue()],
   resolve: {
-    dedupe: ['vue'],
+    // Force one canonical instance of each. Critical because qdadm
+    // (consumed via file: link) carries its own node_modules with
+    // dedup symlinks that may dangle in foreign filesystem layouts
+    // (the sandbox container) — without dedupe Vite would emit two
+    // copies, breaking `useRoute()` injection at runtime.
+    dedupe: ['vue', 'vue-router'],
   },
   // Opt into Sass's modern compiler API (`sass-embedded`) instead of
   // the legacy JS API. Without this Vite spams a deprecation warning
