@@ -1,5 +1,5 @@
 /**
- * InMemoryPluginRegistry — pure-function tests.
+ * InMemoryComponentRegistry — pure-function tests.
  *
  * Coverage focus:
  * - Conflict detection (id duplicate, prefix collision)
@@ -11,71 +11,68 @@
 
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
-  InMemoryPluginRegistry,
-  PluginConflictError,
-  PluginDependencyError,
-  PluginValidationError,
-  type Plugin,
-  type PluginManifest,
-} from '../../src/plugin'
+  ComponentConflictError,
+  ComponentDependencyError,
+  ComponentValidationError,
+  InMemoryComponentRegistry,
+  type ComponentManifest,
+} from '../../src/registry'
 
-function makePlugin(manifest: Partial<PluginManifest> & { id: string }): Plugin {
+function makeManifest(input: Partial<ComponentManifest> & { id: string }): ComponentManifest {
   return {
-    manifest: {
-      version: '1.0.0',
-      prefix: manifest.id, // default prefix == id for tests
-      ...manifest,
-    } as PluginManifest,
-  }
+    version: '1.0.0',
+    prefix: input.id, // default prefix == id for tests
+    ...input,
+  } as ComponentManifest
 }
 
-let registry: InMemoryPluginRegistry
+let registry: InMemoryComponentRegistry
 
 beforeEach(() => {
-  registry = new InMemoryPluginRegistry()
+  registry = new InMemoryComponentRegistry()
 })
 
 describe('register / unregister', () => {
-  it('registers a single valid plugin', () => {
-    registry.register(makePlugin({ id: 'core' }))
+  it('registers a single valid manifest', () => {
+    registry.register(makeManifest({ id: 'core' }))
     expect(registry.has('core')).toBe(true)
     expect(registry.list()).toHaveLength(1)
   })
 
   it('rejects duplicate id', () => {
-    registry.register(makePlugin({ id: 'core' }))
-    expect(() => registry.register(makePlugin({ id: 'core' }))).toThrow(
-      PluginConflictError,
+    registry.register(makeManifest({ id: 'core' }))
+    expect(() => registry.register(makeManifest({ id: 'core' }))).toThrow(
+      ComponentConflictError,
     )
   })
 
   it('rejects prefix collision (different ids, same prefix)', () => {
-    registry.register(makePlugin({ id: 'core' }))
+    registry.register(makeManifest({ id: 'core' }))
     expect(() =>
-      registry.register(makePlugin({ id: 'other_core', prefix: 'core' })),
+      registry.register(makeManifest({ id: 'other_core', prefix: 'core' })),
     ).toThrow(/prefix "core" collides/)
   })
 
   it('rejects invalid manifest at register time', () => {
     expect(() =>
-      registry.register(makePlugin({ id: 'BadId' })),
-    ).toThrow(PluginValidationError)
+      registry.register(makeManifest({ id: 'BadId' })),
+    ).toThrow(ComponentValidationError)
   })
 
   it('unregister removes the entry', () => {
-    registry.register(makePlugin({ id: 'core' }))
+    registry.register(makeManifest({ id: 'core' }))
     registry.unregister('core')
     expect(registry.has('core')).toBe(false)
   })
 
   it('unregister throws if not present', () => {
-    expect(() => registry.unregister('ghost')).toThrow(PluginDependencyError)
+    expect(() => registry.unregister('ghost')).toThrow(ComponentDependencyError)
   })
 
-  it('refuses unregister when another plugin depends on it', () => {
-    registry.register(makePlugin({ id: 'core' }))
+  it('refuses unregister when another manifest depends on it', () => {
+    registry.register(makeManifest({ id: 'core' }))
     registry.register(
-      makePlugin({
+      makeManifest({
         id: 'shop',
         prefix: 'shop',
         dependencies: [{ id: 'core' }],
@@ -87,50 +84,50 @@ describe('register / unregister', () => {
 
 describe('state tracking', () => {
   it('starts at "registered"', () => {
-    registry.register(makePlugin({ id: 'core' }))
+    registry.register(makeManifest({ id: 'core' }))
     expect(registry.get('core')?.state).toBe('registered')
   })
 
   it('setState updates state', () => {
-    registry.register(makePlugin({ id: 'core' }))
+    registry.register(makeManifest({ id: 'core' }))
     registry.setState('core', 'installed')
     expect(registry.get('core')?.state).toBe('installed')
   })
 
   it('setState("failed", err) records the error', () => {
-    registry.register(makePlugin({ id: 'core' }))
+    registry.register(makeManifest({ id: 'core' }))
     const err = new Error('migration broke')
     registry.setState('core', 'failed', err)
     expect(registry.get('core')?.lastError).toBe(err)
   })
 
   it('successful transition clears lastError', () => {
-    registry.register(makePlugin({ id: 'core' }))
+    registry.register(makeManifest({ id: 'core' }))
     registry.setState('core', 'failed', new Error('boom'))
     registry.setState('core', 'installed')
     expect(registry.get('core')?.lastError).toBeUndefined()
   })
 
-  it('setState on unknown plugin throws', () => {
+  it('setState on unknown manifest throws', () => {
     expect(() => registry.setState('ghost', 'active')).toThrow(
-      PluginDependencyError,
+      ComponentDependencyError,
     )
   })
 })
 
 describe('resolveOrder (topological sort)', () => {
   it('sorts independents in some valid order', () => {
-    registry.register(makePlugin({ id: 'a' }))
-    registry.register(makePlugin({ id: 'b', prefix: 'b' }))
+    registry.register(makeManifest({ id: 'a' }))
+    registry.register(makeManifest({ id: 'b', prefix: 'b' }))
     const order = registry.resolveOrder()
     expect(order).toHaveLength(2)
     expect(order).toEqual(expect.arrayContaining(['a', 'b']))
   })
 
   it('places dependency before dependent', () => {
-    registry.register(makePlugin({ id: 'core' }))
+    registry.register(makeManifest({ id: 'core' }))
     registry.register(
-      makePlugin({
+      makeManifest({
         id: 'shop',
         prefix: 'shop',
         dependencies: [{ id: 'core' }],
@@ -141,18 +138,18 @@ describe('resolveOrder (topological sort)', () => {
   })
 
   it('handles a chain a → b → c (c depends on b, b depends on a)', () => {
-    registry.register(makePlugin({ id: 'a' }))
-    registry.register(makePlugin({ id: 'b', prefix: 'b', dependencies: [{ id: 'a' }] }))
-    registry.register(makePlugin({ id: 'c', prefix: 'c', dependencies: [{ id: 'b' }] }))
+    registry.register(makeManifest({ id: 'a' }))
+    registry.register(makeManifest({ id: 'b', prefix: 'b', dependencies: [{ id: 'a' }] }))
+    registry.register(makeManifest({ id: 'c', prefix: 'c', dependencies: [{ id: 'b' }] }))
     expect(registry.resolveOrder()).toEqual(['a', 'b', 'c'])
   })
 
   it('handles a diamond (d depends on b and c; b and c depend on a)', () => {
-    registry.register(makePlugin({ id: 'a' }))
-    registry.register(makePlugin({ id: 'b', prefix: 'b', dependencies: [{ id: 'a' }] }))
-    registry.register(makePlugin({ id: 'c', prefix: 'c', dependencies: [{ id: 'a' }] }))
+    registry.register(makeManifest({ id: 'a' }))
+    registry.register(makeManifest({ id: 'b', prefix: 'b', dependencies: [{ id: 'a' }] }))
+    registry.register(makeManifest({ id: 'c', prefix: 'c', dependencies: [{ id: 'a' }] }))
     registry.register(
-      makePlugin({
+      makeManifest({
         id: 'd',
         prefix: 'd',
         dependencies: [{ id: 'b' }, { id: 'c' }],
@@ -167,7 +164,7 @@ describe('resolveOrder (topological sort)', () => {
 
   it('throws on missing dependency', () => {
     registry.register(
-      makePlugin({
+      makeManifest({
         id: 'shop',
         dependencies: [{ id: 'core_missing' }],
       }),
@@ -176,15 +173,15 @@ describe('resolveOrder (topological sort)', () => {
   })
 
   it('throws on direct cycle a → b → a', () => {
-    registry.register(makePlugin({ id: 'a', dependencies: [{ id: 'b' }] }))
-    registry.register(makePlugin({ id: 'b', prefix: 'b', dependencies: [{ id: 'a' }] }))
+    registry.register(makeManifest({ id: 'a', dependencies: [{ id: 'b' }] }))
+    registry.register(makeManifest({ id: 'b', prefix: 'b', dependencies: [{ id: 'a' }] }))
     expect(() => registry.resolveOrder()).toThrow(/cycle detected/)
   })
 
   it('throws on indirect cycle a → b → c → a', () => {
-    registry.register(makePlugin({ id: 'a', dependencies: [{ id: 'c' }] }))
-    registry.register(makePlugin({ id: 'b', prefix: 'b', dependencies: [{ id: 'a' }] }))
-    registry.register(makePlugin({ id: 'c', prefix: 'c', dependencies: [{ id: 'b' }] }))
+    registry.register(makeManifest({ id: 'a', dependencies: [{ id: 'c' }] }))
+    registry.register(makeManifest({ id: 'b', prefix: 'b', dependencies: [{ id: 'a' }] }))
+    registry.register(makeManifest({ id: 'c', prefix: 'c', dependencies: [{ id: 'b' }] }))
     expect(() => registry.resolveOrder()).toThrow(/cycle detected/)
   })
 })
@@ -192,7 +189,7 @@ describe('resolveOrder (topological sort)', () => {
 describe('extension validation', () => {
   it('passes when extension targets a declared dep table', () => {
     registry.register(
-      makePlugin({
+      makeManifest({
         id: 'core',
         entities: [
           {
@@ -204,7 +201,7 @@ describe('extension validation', () => {
       }),
     )
     registry.register(
-      makePlugin({
+      makeManifest({
         id: 'shop',
         prefix: 'shop',
         dependencies: [{ id: 'core' }],
@@ -216,7 +213,7 @@ describe('extension validation', () => {
 
   it('throws when extension targets unknown table', () => {
     registry.register(
-      makePlugin({
+      makeManifest({
         id: 'shop',
         extensions: { ghost_table: { x: { type: 'string' } } },
       }),
@@ -228,7 +225,7 @@ describe('extension validation', () => {
 
   it('throws when extending an existing table without declaring the dep', () => {
     registry.register(
-      makePlugin({
+      makeManifest({
         id: 'core',
         entities: [
           { name: 'user', tableName: 'users', fields: { id: { type: 'uuid', pk: true } } },
@@ -236,7 +233,7 @@ describe('extension validation', () => {
       }),
     )
     registry.register(
-      makePlugin({
+      makeManifest({
         id: 'shop',
         prefix: 'shop',
         // dependencies missing
@@ -248,9 +245,9 @@ describe('extension validation', () => {
     )
   })
 
-  it('throws when a plugin extends its own table (mistake)', () => {
+  it('throws when a manifest extends its own table (mistake)', () => {
     registry.register(
-      makePlugin({
+      makeManifest({
         id: 'shop',
         entities: [
           { name: 'order', tableName: 'orders', fields: { id: { type: 'uuid', pk: true } } },
@@ -265,9 +262,9 @@ describe('extension validation', () => {
 })
 
 describe('findTableOwner', () => {
-  it('returns the plugin that owns a physical table', () => {
+  it('returns the manifest that owns a physical table', () => {
     registry.register(
-      makePlugin({
+      makeManifest({
         id: 'core',
         entities: [
           { name: 'user', tableName: 'users', fields: { id: { type: 'uuid', pk: true } } },
@@ -283,7 +280,7 @@ describe('findTableOwner', () => {
 
   it('matches even when the entity tableName already includes the prefix', () => {
     registry.register(
-      makePlugin({
+      makeManifest({
         id: 'dc',
         prefix: 'dc',
         entities: [

@@ -21,7 +21,7 @@ import { canonicalJSON } from './canonicalize'
 import type { ComposedSchema, SqlDialect } from './types'
 
 export interface HashSchemaInput {
-  pluginId: string
+  componentId: string
   pluginVersion: string
   schema: ComposedSchema
   dialect: SqlDialect
@@ -34,7 +34,7 @@ export interface HashSchemaInput {
  */
 export function hashSchema(input: HashSchemaInput): string {
   const payload = canonicalJSON({
-    plugin: input.pluginId,
+    plugin: input.componentId,
     version: input.pluginVersion,
     dialect: input.dialect,
     schema: input.schema,

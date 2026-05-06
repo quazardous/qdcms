@@ -5,7 +5,7 @@
  * `package.json` carries `keywords: ["qdcms-plugin"]`, reads each
  * package's manifest YAML (path declared by `package.json#qdcms`,
  * defaults to `qdcms-plugin.yaml`), and produces ready-to-register
- * `Plugin` objects via `buildManifestFromPackageJson`.
+ * `ComponentManifest` objects via `buildManifestFromPackageJson`.
  *
  * **Workspace-friendly.** npm/pnpm/yarn workspaces install plugins as
  * symlinks inside `node_modules` — `realpath` resolution turns symlinks
@@ -24,7 +24,7 @@ import {
   buildManifestFromPackageJson,
   type QdcmsPackageJson,
 } from '@quazardous/qdcms-core/loader'
-import type { Plugin } from '@quazardous/qdcms-core/plugin'
+import type { ComponentManifest } from '@quazardous/qdcms-core/registry'
 
 const QDCMS_PLUGIN_KEYWORD = 'qdcms-plugin'
 const DEFAULT_YAML_NAME = 'qdcms-plugin.yaml'
@@ -38,8 +38,8 @@ export interface DiscoveredPlugin {
   packageJson: QdcmsPackageJson
   /** Raw YAML content of the qdcms-plugin manifest file. */
   qdcmsYaml: string
-  /** The unified plugin object built via buildManifestFromPackageJson. */
-  plugin: Plugin
+  /** The unified manifest built via buildManifestFromPackageJson. */
+  manifest: ComponentManifest
 }
 
 export interface LoadFromNodeModulesOptions {
@@ -217,14 +217,13 @@ async function tryLoadPackage(
   }
 
   // Build the unified manifest. Adapter does its own validation.
-  let plugin: Plugin
+  let manifest: ComponentManifest
   try {
-    const manifest = buildManifestFromPackageJson({ packageJson: pkg, qdcmsYaml })
-    plugin = { manifest }
+    manifest = buildManifestFromPackageJson({ packageJson: pkg, qdcmsYaml })
   } catch (cause) {
     errors.push({ path: packagePath, error: cause as Error })
     return
   }
 
-  out.push({ path: packagePath, packageJson: pkg, qdcmsYaml, plugin })
+  out.push({ path: packagePath, packageJson: pkg, qdcmsYaml, manifest })
 }

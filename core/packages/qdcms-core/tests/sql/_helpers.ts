@@ -9,10 +9,9 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  InMemoryPluginRegistry,
-  type Plugin,
-  type PluginManifest,
-} from '../../src/plugin'
+  InMemoryComponentRegistry,
+  type ComponentManifest,
+} from '../../src/registry'
 import {
   MikroOrmBackendStorage,
   MikroOrmMigrationRunner,
@@ -22,7 +21,7 @@ import {
 export interface TestRig {
   storage: MikroOrmBackendStorage
   store: SqlMigrationStore
-  registry: InMemoryPluginRegistry
+  registry: InMemoryComponentRegistry
   runner: MikroOrmMigrationRunner
   /**
    * Tear down the in-memory DB. Call from `afterEach`.
@@ -55,7 +54,7 @@ export async function createTestRig(): Promise<TestRig> {
   })
 
   const store = new SqlMigrationStore(storage)
-  const registry = new InMemoryPluginRegistry()
+  const registry = new InMemoryComponentRegistry()
   const runner = new MikroOrmMigrationRunner({
     storage,
     store,
@@ -83,29 +82,27 @@ export async function createTestRig(): Promise<TestRig> {
   }
 }
 
-// ─── Fake plugin builder ──────────────────────────────────────────────────
+// ─── Fake manifest builder ────────────────────────────────────────────────
 
 export interface FakePluginInput {
   id: string
   prefix?: string
   version?: string
   dependencies?: { id: string; version?: string }[]
-  entities?: PluginManifest['entities']
-  extensions?: PluginManifest['extensions']
+  entities?: ComponentManifest['entities']
+  extensions?: ComponentManifest['extensions']
   schemaManaged?: boolean
 }
 
-export function makeFakePlugin(input: FakePluginInput): Plugin {
+export function makeFakePlugin(input: FakePluginInput): ComponentManifest {
   return {
-    manifest: {
-      id: input.id,
-      version: input.version ?? '1.0.0',
-      prefix: input.prefix ?? input.id,
-      dependencies: input.dependencies,
-      entities: input.entities,
-      extensions: input.extensions,
-      schemaManaged: input.schemaManaged,
-    },
+    id: input.id,
+    version: input.version ?? '1.0.0',
+    prefix: input.prefix ?? input.id,
+    dependencies: input.dependencies,
+    entities: input.entities,
+    extensions: input.extensions,
+    schemaManaged: input.schemaManaged,
   }
 }
 

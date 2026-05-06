@@ -66,7 +66,7 @@ describe('canonicalJSON', () => {
 
 describe('hashSchema', () => {
   const baseInput = () => ({
-    pluginId: 'dc',
+    componentId: 'dc',
     pluginVersion: '1.0.0',
     schema: baseSchema(),
     dialect: 'sqlite' as const,
@@ -106,7 +106,7 @@ describe('hashSchema', () => {
 
   it('changes when plugin id changes', () => {
     const h1 = hashSchema(baseInput())
-    const h2 = hashSchema({ ...baseInput(), pluginId: 'other' })
+    const h2 = hashSchema({ ...baseInput(), componentId: 'other' })
     expect(h1).not.toBe(h2)
   })
 

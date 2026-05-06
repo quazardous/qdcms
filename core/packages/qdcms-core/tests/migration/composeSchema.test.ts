@@ -14,9 +14,9 @@ import {
   composePluginSchema,
   MigrationOwnershipError,
 } from '../../src/migration'
-import type { PluginManifest } from '../../src/plugin'
+import type { ComponentManifest } from '../../src/registry'
 
-const corePlugin = (): PluginManifest => ({
+const corePlugin = (): ComponentManifest => ({
   id: 'core',
   version: '1.0.0',
   prefix: 'core',
@@ -33,7 +33,7 @@ const corePlugin = (): PluginManifest => ({
   ],
 })
 
-const dcPlugin = (): PluginManifest => ({
+const dcPlugin = (): ComponentManifest => ({
   id: 'dc',
   version: '0.1.0',
   prefix: 'dc',
@@ -112,7 +112,7 @@ describe('composeFullSchema (multi-plugin)', () => {
   })
 
   it('throws on table-name collision (two plugins claim same table)', () => {
-    const a: PluginManifest = {
+    const a: ComponentManifest = {
       id: 'a',
       version: '1.0.0',
       prefix: 'shared', // intentional collision via prefix
@@ -124,7 +124,7 @@ describe('composeFullSchema (multi-plugin)', () => {
         },
       ],
     }
-    const b: PluginManifest = {
+    const b: ComponentManifest = {
       id: 'b',
       version: '1.0.0',
       prefix: 'shared',
@@ -140,14 +140,14 @@ describe('composeFullSchema (multi-plugin)', () => {
   })
 
   it('throws on extension-column collision (two plugins same column on same table)', () => {
-    const ext1: PluginManifest = {
+    const ext1: ComponentManifest = {
       id: 'a',
       version: '1.0.0',
       prefix: 'a',
       dependencies: [{ id: 'core' }],
       extensions: { core_users: { bio: { type: 'text' } } },
     }
-    const ext2: PluginManifest = {
+    const ext2: ComponentManifest = {
       id: 'b',
       version: '1.0.0',
       prefix: 'b',
@@ -160,7 +160,7 @@ describe('composeFullSchema (multi-plugin)', () => {
   })
 
   it('throws when an extension targets a non-existent table', () => {
-    const orphan: PluginManifest = {
+    const orphan: ComponentManifest = {
       id: 'orphan',
       version: '1.0.0',
       prefix: 'orphan',

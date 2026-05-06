@@ -15,7 +15,7 @@
  */
 
 import { parse as parseYaml } from 'yaml'
-import { isValidSemver } from '../../plugin/validation'
+import { isValidSemver } from '../../registry/validation'
 import {
   UpgradeFile,
   UpgradeFileError,

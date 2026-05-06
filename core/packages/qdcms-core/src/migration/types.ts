@@ -72,7 +72,7 @@ export interface Migration {
  * last generation — used as the baseline for the next diff.
  */
 export interface PluginSchemaState {
-  pluginId: string
+  componentId: string
   pluginVersion: string
   /** Hash of the last generated schema — same value as the latest migration's hash. */
   hash: string
@@ -90,7 +90,7 @@ export interface ComposedSchema {
   ownedTables: EntityDescriptor[]
   /**
    * Columns this plugin adds to OTHER plugins' tables. Indexed by foreign
-   * physical table name. Each field carries `owner = pluginId`.
+   * physical table name. Each field carries `owner = componentId`.
    */
   extensions: Record<string, EntityDescriptor['fields']>
 }

@@ -16,7 +16,7 @@ import {
   buildManifestFromPackageJson,
   defaultIsPluginDependency,
 } from '../../src/loader'
-import { PluginValidationError } from '../../src/plugin'
+import { ComponentValidationError } from '../../src/registry'
 
 const validYaml = `
 prefix: shop
@@ -170,7 +170,7 @@ describe('buildManifestFromPackageJson — error paths', () => {
         packageJson: null as unknown as never,
         qdcmsYaml: validYaml,
       }),
-    ).toThrow(PluginValidationError)
+    ).toThrow(ComponentValidationError)
   })
 
   it('rejects missing name', () => {
@@ -236,13 +236,13 @@ describe('buildManifestFromPackageJson — error paths', () => {
     ).toThrow(/"dependencies" must not be set in the YAML/)
   })
 
-  it('runs validateManifest by default and surfaces failures', () => {
+  it('runs validateComponentManifest by default and surfaces failures', () => {
     expect(() =>
       buildManifestFromPackageJson({
         packageJson: { name: 'BadName', version: '1.0.0' },
         qdcmsYaml: validYaml,
       }),
-    ).toThrow(PluginValidationError)
+    ).toThrow(ComponentValidationError)
   })
 
   it('skips validation when validate: false', () => {

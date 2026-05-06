@@ -64,7 +64,7 @@ export async function buildServer(config: QdcmsServerConfig): Promise<ServerHand
   }
   console.log(
     `[qdcms-backend-server] discovered ${backend.discovered.length} plugin(s):`,
-    backend.discovered.map((p) => p.plugin.manifest.id).join(', ') || '(none)',
+    backend.discovered.map((p) => p.manifest.id).join(', ') || '(none)',
   )
 
   // 2. Express setup. Body parsing for JSON; everything else stays
@@ -80,7 +80,7 @@ export async function buildServer(config: QdcmsServerConfig): Promise<ServerHand
   app.get('/health', (_req, res) => {
     res.json({
       ok: true,
-      plugins: backend.discovered.map((p) => p.plugin.manifest.id),
+      plugins: backend.discovered.map((p) => p.manifest.id),
     })
   })
 

@@ -5,7 +5,7 @@
  * 1. Read THIS package's own package.json + qdcms-plugin.yaml from disk
  *    (proves the npm-pure manifest contract works on a real package)
  * 2. Build a unified PluginManifest via buildManifestFromPackageJson
- * 3. Register in InMemoryPluginRegistry
+ * 3. Register in InMemoryComponentRegistry
  * 4. Install via MikroOrmMigrationRunner against an in-memory SQLite
  * 5. Verify both `core_users` and `core_sessions` tables exist
  * 6. Insert + read a user via raw SQL through the storage
@@ -19,7 +19,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { InMemoryPluginRegistry } from '@quazardous/qdcms-core/plugin'
+import { InMemoryComponentRegistry } from '@quazardous/qdcms-core/registry'
 import { buildManifestFromPackageJson } from '@quazardous/qdcms-core/loader'
 import {
   MikroOrmBackendStorage,
@@ -32,7 +32,7 @@ import {
 interface Rig {
   storage: MikroOrmBackendStorage
   store: SqlMigrationStore
-  registry: InMemoryPluginRegistry
+  registry: InMemoryComponentRegistry
   runner: MikroOrmMigrationRunner
   cleanup(): Promise<void>
 }
@@ -54,7 +54,7 @@ async function createRig(): Promise<Rig> {
     entities: [],
   })
   const store = new SqlMigrationStore(storage)
-  const registry = new InMemoryPluginRegistry()
+  const registry = new InMemoryComponentRegistry()
   const runner = new MikroOrmMigrationRunner({
     storage,
     store,
@@ -169,7 +169,7 @@ describe('end-to-end install + insert + cascade', () => {
       packageJson: pkg,
       qdcmsYaml: yaml,
     })
-    rig.registry.register({ manifest })
+    rig.registry.register(manifest)
 
     await rig.runner.install(manifest.id)
 
@@ -195,7 +195,7 @@ describe('end-to-end install + insert + cascade', () => {
       packageJson: pkg,
       qdcmsYaml: yaml,
     })
-    rig.registry.register({ manifest })
+    rig.registry.register(manifest)
     await rig.runner.install(manifest.id)
 
     await exec(
@@ -233,7 +233,7 @@ describe('end-to-end install + insert + cascade', () => {
       packageJson: pkg,
       qdcmsYaml: yaml,
     })
-    rig.registry.register({ manifest })
+    rig.registry.register(manifest)
     await rig.runner.install(manifest.id)
 
     const userId = '22222222-2222-2222-2222-222222222222'
@@ -276,7 +276,7 @@ describe('end-to-end uninstall', () => {
       packageJson: pkg,
       qdcmsYaml: yaml,
     })
-    rig.registry.register({ manifest })
+    rig.registry.register(manifest)
     await rig.runner.install(manifest.id)
     expect(await listTables(rig.storage)).toEqual(
       expect.arrayContaining(['core_users', 'core_sessions']),
@@ -300,7 +300,7 @@ describe('schema_state row shape after install', () => {
       packageJson: pkg,
       qdcmsYaml: yaml,
     })
-    rig.registry.register({ manifest })
+    rig.registry.register(manifest)
     await rig.runner.install(manifest.id)
 
     const rows = await rig.store.appliedForExtended(manifest.id)

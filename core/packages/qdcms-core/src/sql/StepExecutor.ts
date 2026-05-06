@@ -29,7 +29,7 @@ import type {
   UpgradeStep,
 } from '../migration/hints/types'
 import { MigrationError, type SqlDialect } from '../migration/types'
-import type { PluginManifest } from '../plugin/types'
+import type { ComponentManifest } from '../registry/types'
 import { MikroOrmBackendStorage } from './MikroOrmBackendStorage'
 
 export interface UpgradeContext {
@@ -40,18 +40,18 @@ export interface UpgradeContext {
   /** Structured logger. */
   logger: { info(msg: string): void; warn(msg: string): void; error(msg: string): void }
   /** The plugin manifest at the version being upgraded TO. */
-  manifest: PluginManifest
+  manifest: ComponentManifest
 }
 
 export interface ExecuteStepOptions {
   /** The plugin manifest at the version this hint upgrades TO. */
-  manifest: PluginManifest
+  manifest: ComponentManifest
   /** Path of the YAML file the step came from (for resolving script paths). */
   upgradeFilePath: string
 }
 
 export interface ExecuteFileOptions {
-  manifest: PluginManifest
+  manifest: ComponentManifest
 }
 
 export class StepExecutor {
@@ -283,7 +283,7 @@ export class StepExecutor {
 
   // ─── Internals ──────────────────────────────────────────────────────────
 
-  private resolveTableName(entity: string, manifest: PluginManifest): string {
+  private resolveTableName(entity: string, manifest: ComponentManifest): string {
     const ent = (manifest.entities ?? []).find((e) => e.name === entity)
     if (!ent) {
       throw new MigrationError(
@@ -299,7 +299,7 @@ export class StepExecutor {
   private resolveFieldDefinition(
     entity: string,
     field: string,
-    manifest: PluginManifest,
+    manifest: ComponentManifest,
   ): { type: string; nullable?: boolean; length?: number; default?: unknown } {
     const ent = (manifest.entities ?? []).find((e) => e.name === entity)
     if (!ent) {
@@ -400,7 +400,7 @@ export class StepExecutor {
     await this.storage.getOrm().em.getConnection().execute(sql)
   }
 
-  private makeContext(manifest: PluginManifest): UpgradeContext {
+  private makeContext(manifest: ComponentManifest): UpgradeContext {
     return {
       exec: async (sql, params) =>
         await this.storage.getOrm().em.getConnection().execute(sql, params),

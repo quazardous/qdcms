@@ -79,7 +79,7 @@ describe('createBackend — discovery + boot', () => {
     try {
       // Plugin discovered
       expect(backend.discovered).toHaveLength(1)
-      expect(backend.discovered[0].plugin.manifest.id).toBe(
+      expect(backend.discovered[0].manifest.id).toBe(
         '@quazardous/qdcms-plugin-core',
       )
 

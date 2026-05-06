@@ -1,5 +1,5 @@
 /**
- * packageJsonAdapter — build a PluginManifest from
+ * packageJsonAdapter — build an ComponentManifest from
  * `package.json` + `qdcms-plugin.yaml`.
  *
  * **The contract for npm-distributed plugins.** A qdcms plugin is an
@@ -23,7 +23,7 @@
  *   extensions: { ... }
  *   schemaManaged: true
  *
- * This module merges both into the unified runtime PluginManifest shape.
+ * This module merges both into the unified runtime ComponentManifest shape.
  *
  * The future Phase 3 NodeModulesPluginLoader will scan node_modules,
  * find packages with the `qdcms-plugin` keyword, and call this adapter
@@ -33,10 +33,10 @@
 
 import { parse as parseYaml } from 'yaml'
 import {
-  PluginValidationError,
-  type PluginManifest,
-} from '../plugin/types'
-import { validateManifest } from '../plugin/validation'
+  ComponentValidationError,
+  type ComponentManifest,
+} from '../registry/types'
+import { validateComponentManifest } from '../registry/validation'
 
 /**
  * Subset of the standard package.json fields we care about. Other fields
@@ -76,31 +76,31 @@ export interface BuildManifestInput {
 }
 
 /**
- * Build a unified PluginManifest from package.json + qdcms-plugin.yaml.
+ * Build a unified ComponentManifest from package.json + qdcms-plugin.yaml.
  *
- * Throws PluginValidationError on:
+ * Throws ComponentValidationError on:
  * - missing or non-string package.json#name / #version
  * - yaml parse failure
  * - yaml top-level not a mapping
  * - yaml contains forbidden fields (id, version, dependencies — those
  *   come from package.json; YAML having them = author confusion)
- * - validateManifest failure (when validate=true, default)
+ * - validateComponentManifest failure (when validate=true, default)
  */
 export function buildManifestFromPackageJson(
   input: BuildManifestInput,
-): PluginManifest {
+): ComponentManifest {
   const { packageJson, qdcmsYaml } = input
   const validate = input.validate ?? true
   const isPluginDep = input.isPluginDependency ?? defaultIsPluginDependency
 
   if (!packageJson || typeof packageJson !== 'object') {
-    throw new PluginValidationError('package.json is not an object')
+    throw new ComponentValidationError('package.json is not an object')
   }
   if (typeof packageJson.name !== 'string' || !packageJson.name) {
-    throw new PluginValidationError('package.json.name is required')
+    throw new ComponentValidationError('package.json.name is required')
   }
   if (typeof packageJson.version !== 'string' || !packageJson.version) {
-    throw new PluginValidationError('package.json.version is required', packageJson.name)
+    throw new ComponentValidationError('package.json.version is required', packageJson.name)
   }
 
   // Parse YAML
@@ -108,13 +108,13 @@ export function buildManifestFromPackageJson(
   try {
     yamlDoc = parseYaml(qdcmsYaml)
   } catch (cause) {
-    throw new PluginValidationError(
+    throw new ComponentValidationError(
       `qdcms-plugin.yaml: failed to parse: ${(cause as Error).message}`,
       packageJson.name,
     )
   }
   if (!yamlDoc || typeof yamlDoc !== 'object' || Array.isArray(yamlDoc)) {
-    throw new PluginValidationError(
+    throw new ComponentValidationError(
       'qdcms-plugin.yaml: top-level must be a YAML mapping',
       packageJson.name,
     )
@@ -125,7 +125,7 @@ export function buildManifestFromPackageJson(
   // Forbidden YAML fields — these belong in package.json.
   for (const forbidden of ['id', 'version', 'dependencies'] as const) {
     if (forbidden in yamlObj) {
-      throw new PluginValidationError(
+      throw new ComponentValidationError(
         `qdcms-plugin.yaml: "${forbidden}" must not be set in the YAML — ` +
           `it comes from package.json (npm-pure mode, see docs/plugins.md §16)`,
         packageJson.name,
@@ -144,14 +144,14 @@ export function buildManifestFromPackageJson(
     .map(([id, version]) => ({ id, version }))
 
   // Compose final manifest. YAML gives `entities:` as a mapping
-  // (keyed by entity logical name) — our PluginManifest type wants an
+  // (keyed by entity logical name) — our ComponentManifest type wants an
   // array of EntityDescriptor with `name` explicit, so convert.
   const entities =
     yamlObj.entities && typeof yamlObj.entities === 'object'
       ? entitiesFromYaml(yamlObj.entities as Record<string, unknown>, packageJson.name)
       : undefined
 
-  const manifest: PluginManifest = {
+  const manifest: ComponentManifest = {
     id: packageJson.name,
     version: packageJson.version,
     prefix: typeof yamlObj.prefix === 'string' ? yamlObj.prefix : '',
@@ -160,32 +160,32 @@ export function buildManifestFromPackageJson(
       typeof yamlObj.description === 'string' ? yamlObj.description : undefined,
     dependencies: dependencies.length > 0 ? dependencies : undefined,
     entities,
-    extensions: yamlObj.extensions as PluginManifest['extensions'] | undefined,
+    extensions: yamlObj.extensions as ComponentManifest['extensions'] | undefined,
     schemaManaged:
       typeof yamlObj.schemaManaged === 'boolean' ? yamlObj.schemaManaged : undefined,
   }
 
   if (validate) {
-    validateManifest(manifest)
+    validateComponentManifest(manifest)
   }
   return manifest
 }
 
 /**
  * Convert the YAML `entities:` mapping into the array form
- * `EntityDescriptor[]` expected by `PluginManifest`. YAML keys become
+ * `EntityDescriptor[]` expected by `ComponentManifest`. YAML keys become
  * `name`. Each entry must have at least `tableName` and `fields`.
  */
 function entitiesFromYaml(
   obj: Record<string, unknown>,
-  pluginId: string,
-): PluginManifest['entities'] {
-  const out: NonNullable<PluginManifest['entities']> = []
+  componentId: string,
+): ComponentManifest['entities'] {
+  const out: NonNullable<ComponentManifest['entities']> = []
   for (const [name, raw] of Object.entries(obj)) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      throw new PluginValidationError(
+      throw new ComponentValidationError(
         `qdcms-plugin.yaml: entity "${name}" must be a mapping`,
-        pluginId,
+        componentId,
       )
     }
     const def = raw as Record<string, unknown>
@@ -197,17 +197,17 @@ function entitiesFromYaml(
         ? def.tableName
         : name
     if (!def.fields || typeof def.fields !== 'object') {
-      throw new PluginValidationError(
+      throw new ComponentValidationError(
         `qdcms-plugin.yaml: entity "${name}" is missing fields`,
-        pluginId,
+        componentId,
       )
     }
     out.push({
       name,
       tableName,
-      fields: def.fields as NonNullable<PluginManifest['entities']>[number]['fields'],
+      fields: def.fields as NonNullable<ComponentManifest['entities']>[number]['fields'],
       indexes: Array.isArray(def.indexes)
-        ? (def.indexes as NonNullable<PluginManifest['entities']>[number]['indexes'])
+        ? (def.indexes as NonNullable<ComponentManifest['entities']>[number]['indexes'])
         : undefined,
     })
   }

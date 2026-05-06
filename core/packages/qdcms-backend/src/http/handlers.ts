@@ -30,13 +30,13 @@ import {
 export const getPlugins: QdcmsHandler = async (_req, ctx) => {
   const entries = ctx.backend.registry.list()
   const body = entries.map(
-    (e: { plugin: { manifest: Record<string, unknown> }; state: string }) => ({
-      id: e.plugin.manifest.id,
-      version: e.plugin.manifest.version,
-      prefix: e.plugin.manifest.prefix,
-      title: e.plugin.manifest.title,
-      description: e.plugin.manifest.description,
-      dependencies: e.plugin.manifest.dependencies,
+    (e: { manifest: Record<string, unknown>; state: string }) => ({
+      id: e.manifest.id,
+      version: e.manifest.version,
+      prefix: e.manifest.prefix,
+      title: e.manifest.title,
+      description: e.manifest.description,
+      dependencies: e.manifest.dependencies,
       state: e.state,
     }),
   )
@@ -50,12 +50,12 @@ export const getPlugins: QdcmsHandler = async (_req, ctx) => {
  * Returns null if no installed plugin owns it.
  */
 function resolveEntity(
-  ctx: { backend: { registry: { list(): { plugin: { manifest: Record<string, unknown> }; state: string }[] } } },
+  ctx: { backend: { registry: { list(): { manifest: Record<string, unknown>; state: string }[] } } },
   entityName: string,
-): { pluginId: string; tableName: string } | null {
+): { componentId: string; tableName: string } | null {
   for (const e of ctx.backend.registry.list()) {
     if (e.state !== 'installed' && e.state !== 'active') continue
-    const m = e.plugin.manifest as {
+    const m = e.manifest as {
       id: string
       prefix: string
       entities?: Array<{ name: string; tableName: string }>
@@ -65,7 +65,7 @@ function resolveEntity(
       const tableName = ent.tableName.startsWith(`${m.prefix}_`)
         ? ent.tableName
         : `${m.prefix}_${ent.tableName}`
-      return { pluginId: m.id, tableName }
+      return { componentId: m.id, tableName }
     }
   }
   return null
@@ -209,7 +209,7 @@ export const getSchemaState: QdcmsHandler = async (_req, ctx) => {
   const entries = ctx.backend.registry.list()
   const out: Record<string, unknown[]> = {}
   for (const e of entries) {
-    const id = e.plugin.manifest.id as string
+    const id = e.manifest.id as string
     out[id] = await ctx.backend.store.appliedForExtended(id)
   }
   return ok(out)
@@ -217,10 +217,10 @@ export const getSchemaState: QdcmsHandler = async (_req, ctx) => {
 
 /** GET /schema-state/:plugin — applied migration rows for one plugin. */
 export const getSchemaStateForPlugin: QdcmsHandler = async (_req, ctx) => {
-  const pluginId = ctx.params.plugin
-  if (!ctx.backend.registry.has(pluginId)) {
-    return notFound(`plugin "${pluginId}" not registered`)
+  const componentId = ctx.params.plugin
+  if (!ctx.backend.registry.has(componentId)) {
+    return notFound(`plugin "${componentId}" not registered`)
   }
-  const rows = await ctx.backend.store.appliedForExtended(pluginId)
+  const rows = await ctx.backend.store.appliedForExtended(componentId)
   return ok(rows)
 }

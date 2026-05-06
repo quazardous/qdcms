@@ -13,7 +13,7 @@
 
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { join, parse as parsePath, resolve as resolvePath } from 'node:path'
-import { isValidSemver } from '../../plugin/validation'
+import { isValidSemver } from '../../registry/validation'
 import { parseUpgradeFile } from './parser'
 import {
   UpgradeFile,

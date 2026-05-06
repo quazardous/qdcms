@@ -1,14 +1,14 @@
 /**
- * Schema composer — turns a set of plugin manifests into per-plugin
+ * Schema composer — turns a set of component manifests into per-manifest
  * `ComposedSchema` objects ready for hashing and feeding the diff engine.
  *
  * Responsibilities:
- * - Apply the plugin's `prefix_` to each entity's tableName (idempotent)
- * - Stamp `owner = pluginId` on every field, index, entity
- * - For each `extension`, attach the foreign table's plugin owner and
- *   stamp the extending plugin as the column owner
- * - Detect column-name collisions (two plugins adding the same column to
- *   the same foreign table)
+ * - Apply the manifest's `prefix_` to each entity's tableName (idempotent)
+ * - Stamp `owner = componentId` on every field, index, entity
+ * - For each `extension`, attach the foreign table's owner and
+ *   stamp the extending manifest as the column owner
+ * - Detect column-name collisions (two manifests adding the same column
+ *   to the same foreign table)
  *
  * What this does NOT do:
  * - Render templates (the host pipeline does YAML render before calling here)
@@ -16,13 +16,13 @@
  */
 
 import type { EntityDescriptor } from '../entity/types'
-import type { PluginManifest } from '../plugin/types'
+import type { ComponentManifest } from '../registry/types'
 import { MigrationOwnershipError, type ComposedSchema } from './types'
 
 /**
- * Compose one plugin's contribution. Pure transformation — no I/O, no DB.
+ * Compose one manifest's contribution. Pure transformation — no I/O, no DB.
  */
-export function composePluginSchema(manifest: PluginManifest): ComposedSchema {
+export function composePluginSchema(manifest: ComponentManifest): ComposedSchema {
   const ownedTables = (manifest.entities ?? []).map((e) =>
     stampOwnedEntity(e, manifest),
   )
@@ -34,18 +34,18 @@ export function composePluginSchema(manifest: PluginManifest): ComposedSchema {
 }
 
 /**
- * Compose ALL active plugins into a single virtual `DatabaseSchema`-shaped
+ * Compose ALL active manifests into a single virtual `DatabaseSchema`-shaped
  * map. This is what the diff engine consumes to compute a global update.
  *
- * Throws `MigrationOwnershipError` on column conflicts (two plugins adding
- * the same column to the same table).
+ * Throws `MigrationOwnershipError` on column conflicts (two manifests
+ * adding the same column to the same table).
  *
  * Returns a flat map: physical table name → entity descriptor with merged
  * fields. Owned-table fields keep their original owner (the table's
- * plugin); extension fields keep the extending plugin's owner.
+ * manifest); extension fields keep the extending manifest's owner.
  */
 export function composeFullSchema(
-  manifests: PluginManifest[],
+  manifests: ComponentManifest[],
 ): Record<string, EntityDescriptor> {
   const tables: Record<string, EntityDescriptor> = {}
 
@@ -93,7 +93,7 @@ export function composeFullSchema(
 
 function stampOwnedEntity(
   entity: EntityDescriptor,
-  manifest: PluginManifest,
+  manifest: ComponentManifest,
 ): EntityDescriptor {
   const physicalName = entity.tableName.startsWith(`${manifest.prefix}_`)
     ? entity.tableName
@@ -110,11 +110,11 @@ function stampOwnedEntity(
 
 function stampOwnedFields(
   fields: EntityDescriptor['fields'],
-  pluginId: string,
+  ownerId: string,
 ): EntityDescriptor['fields'] {
   const out: EntityDescriptor['fields'] = {}
   for (const [name, config] of Object.entries(fields)) {
-    out[name] = { ...config, owner: pluginId }
+    out[name] = { ...config, owner: ownerId }
   }
   return out
 }

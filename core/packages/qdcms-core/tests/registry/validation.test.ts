@@ -1,32 +1,33 @@
 /**
  * Manifest validation — pure-function tests.
  *
- * The validator is the gatekeeper for everything else (registry refuses to
- * accept invalid manifests). Tests must cover every error branch so the
- * registry never sees malformed input.
+ * The validator is the gatekeeper for everything else (registry refuses
+ * to accept invalid manifests). Tests must cover every error branch so
+ * the registry never sees malformed input.
  */
 
 import { describe, expect, it } from 'vitest'
 import {
-  isValidPluginId,
-  isValidPluginPrefix,
+  ComponentValidationError,
+  isValidComponentManifestId,
+  isValidComponentManifestPrefix,
   isValidSemver,
-  PluginValidationError,
-  validateManifest,
-  type PluginManifest,
-} from '../../src/plugin'
+  validateComponentManifest,
+  type ComponentManifest,
+} from '../../src/registry'
 
-const baseManifest = (): PluginManifest => ({
+const baseManifest = (): ComponentManifest => ({
   id: 'core',
   version: '1.0.0',
   prefix: 'core',
 })
 
-describe('plugin validation primitives', () => {
-  describe('isValidPluginId', () => {
-    // Plugin id == npm package name (npm-pure mode). Tests the npm-aligned
-    // regex: scoped names allowed, dots/digits allowed (lodash.debounce,
-    // 9001 are real npm names), uppercase forbidden, leading _/. forbidden.
+describe('manifest validation primitives', () => {
+  describe('isValidComponentManifestId', () => {
+    // Manifest id == npm package name (npm-pure mode). Tests the
+    // npm-aligned regex: scoped names allowed, dots/digits allowed
+    // (lodash.debounce, 9001 are real npm names), uppercase forbidden,
+    // leading _/. forbidden.
     it.each([
       ['core', true],
       ['dynamic_content', true],
@@ -45,12 +46,12 @@ describe('plugin validation primitives', () => {
       ['CORE', false],
       ['@/foo', false], // empty scope
       ['@scope/', false], // empty name
-    ])('isValidPluginId(%j) === %s', (input, expected) => {
-      expect(isValidPluginId(input)).toBe(expected)
+    ])('isValidComponentManifestId(%j) === %s', (input, expected) => {
+      expect(isValidComponentManifestId(input)).toBe(expected)
     })
   })
 
-  describe('isValidPluginPrefix', () => {
+  describe('isValidComponentManifestPrefix', () => {
     it.each([
       ['core', true],
       ['dc', true],
@@ -61,8 +62,8 @@ describe('plugin validation primitives', () => {
       ['my-shop', false], // dashes are NOT allowed in prefixes (table naming)
       ['9dc', false],
       ['_dc', false],
-    ])('isValidPluginPrefix(%j) === %s', (input, expected) => {
-      expect(isValidPluginPrefix(input)).toBe(expected)
+    ])('isValidComponentManifestPrefix(%j) === %s', (input, expected) => {
+      expect(isValidComponentManifestPrefix(input)).toBe(expected)
     })
   })
 
@@ -86,65 +87,65 @@ describe('plugin validation primitives', () => {
   })
 })
 
-describe('validateManifest', () => {
+describe('validateComponentManifest', () => {
   it('accepts a minimal valid manifest', () => {
-    expect(() => validateManifest(baseManifest())).not.toThrow()
+    expect(() => validateComponentManifest(baseManifest())).not.toThrow()
   })
 
   it.each([null, undefined, 'string', 42])('rejects non-object manifest %j', (input) => {
-    expect(() => validateManifest(input as unknown as PluginManifest)).toThrow(
-      PluginValidationError,
+    expect(() => validateComponentManifest(input as unknown as ComponentManifest)).toThrow(
+      ComponentValidationError,
     )
   })
 
   it('rejects missing id', () => {
     expect(() =>
-      validateManifest({ ...baseManifest(), id: '' as string }),
+      validateComponentManifest({ ...baseManifest(), id: '' as string }),
     ).toThrow(/manifest\.id is required/)
   })
 
   it('rejects invalid id', () => {
     expect(() =>
-      validateManifest({ ...baseManifest(), id: 'BadId' }),
+      validateComponentManifest({ ...baseManifest(), id: 'BadId' }),
     ).toThrow(/must match/)
   })
 
   it('rejects missing version', () => {
     expect(() =>
-      validateManifest({ ...baseManifest(), version: '' as string }),
+      validateComponentManifest({ ...baseManifest(), version: '' as string }),
     ).toThrow(/manifest\.version is required/)
   })
 
   it('rejects invalid semver', () => {
     expect(() =>
-      validateManifest({ ...baseManifest(), version: '1.0' }),
+      validateComponentManifest({ ...baseManifest(), version: '1.0' }),
     ).toThrow(/not valid semver/)
   })
 
   it('rejects missing prefix', () => {
     expect(() =>
-      validateManifest({ ...baseManifest(), prefix: '' as string }),
+      validateComponentManifest({ ...baseManifest(), prefix: '' as string }),
     ).toThrow(/manifest\.prefix is required/)
   })
 
   it('rejects prefix with dashes', () => {
     expect(() =>
-      validateManifest({ ...baseManifest(), prefix: 'my-shop' }),
+      validateComponentManifest({ ...baseManifest(), prefix: 'my-shop' }),
     ).toThrow(/must match/)
   })
 
   it('rejects non-array dependencies', () => {
     expect(() =>
-      validateManifest({
+      validateComponentManifest({
         ...baseManifest(),
-        dependencies: 'core' as unknown as PluginManifest['dependencies'],
+        dependencies: 'core' as unknown as ComponentManifest['dependencies'],
       }),
     ).toThrow(/must be an array/)
   })
 
   it('rejects dependency with invalid id', () => {
     expect(() =>
-      validateManifest({
+      validateComponentManifest({
         ...baseManifest(),
         dependencies: [{ id: 'Bad ID' }],
       }),
@@ -153,7 +154,7 @@ describe('validateManifest', () => {
 
   it('accepts well-formed extensions', () => {
     expect(() =>
-      validateManifest({
+      validateComponentManifest({
         ...baseManifest(),
         extensions: {
           core_users: { newsletter_opt_in: { type: 'boolean' } },
@@ -164,19 +165,19 @@ describe('validateManifest', () => {
 
   it('rejects extensions that is not an object', () => {
     expect(() =>
-      validateManifest({
+      validateComponentManifest({
         ...baseManifest(),
-        extensions: [] as unknown as PluginManifest['extensions'],
+        extensions: [] as unknown as ComponentManifest['extensions'],
       }),
     ).toThrow(/keyed by table name/)
   })
 
-  it('attaches the pluginId to the error', () => {
+  it('attaches the componentId to the error', () => {
     try {
-      validateManifest({ ...baseManifest(), id: 'core', version: 'invalid' })
+      validateComponentManifest({ ...baseManifest(), id: 'core', version: 'invalid' })
     } catch (e) {
-      expect(e).toBeInstanceOf(PluginValidationError)
-      expect((e as PluginValidationError).pluginId).toBe('core')
+      expect(e).toBeInstanceOf(ComponentValidationError)
+      expect((e as ComponentValidationError).componentId).toBe('core')
       return
     }
     expect.fail('should have thrown')

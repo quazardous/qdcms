@@ -12,9 +12,9 @@
 
 import type { Options as MikroOrmOptions } from '@mikro-orm/core'
 import {
-  InMemoryPluginRegistry,
-  type PluginRegistry,
-} from '@quazardous/qdcms-core/plugin'
+  InMemoryComponentRegistry,
+  type ComponentRegistry,
+} from '@quazardous/qdcms-core/registry'
 import {
   MikroOrmBackendStorage,
   MikroOrmMigrationRunner,
@@ -63,7 +63,7 @@ export interface CreateBackendOptions {
 }
 
 export interface QdcmsBackend {
-  registry: PluginRegistry
+  registry: ComponentRegistry
   storage: MikroOrmBackendStorage
   store: SqlMigrationStore
   runner: MikroOrmMigrationRunner
@@ -103,7 +103,7 @@ export async function createBackend(
     entities: [],
   })
   const store = new SqlMigrationStore(storage)
-  const registry = new InMemoryPluginRegistry()
+  const registry = new InMemoryComponentRegistry()
   const runner = new MikroOrmMigrationRunner({
     storage,
     store,
@@ -113,7 +113,7 @@ export async function createBackend(
 
   // 3. Register all discovered plugins
   for (const dp of plugins) {
-    registry.register(dp.plugin)
+    registry.register(dp.manifest)
   }
 
   // 4. Validate cross-plugin extensions before any DB work
@@ -123,7 +123,7 @@ export async function createBackend(
   if (installOnBoot) {
     const order = registry.resolveOrder()
     for (const id of order) {
-      const dp = plugins.find((p) => p.plugin.manifest.id === id)
+      const dp = plugins.find((p) => p.manifest.id === id)
       // pluginPath enables hint loading from <plugin>/upgrades/
       await runner.install(id, dp?.path)
     }
