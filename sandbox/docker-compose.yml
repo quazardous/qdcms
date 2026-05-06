@@ -13,6 +13,12 @@
 #  - /demo/data       ← bound from sandbox/demo/data
 #  - /demo/.compiled  ← bound from sandbox/demo/.compiled
 #
+# Multi-domain routing via Traefik :
+#  http://demo-frontend.qdcms.localhost   →  qdcms:5180 (Vite dev)
+#  http://demo-backend.qdcms.localhost    →  qdcms:5181 (Express)
+#  http://traefik.qdcms.localhost         →  Traefik dashboard
+# Plus the legacy direct ports (5180/5181) for non-domain access.
+#
 # Future hook : a config overlay (sandbox-specific YAML
 # overriding the demo's config) would slot in here as additional
 # bind mounts at /demo/config/<file>.yaml. Defer until needed.
@@ -28,33 +34,68 @@ services:
     image: qdcms-sandbox:dev
     container_name: qdcms-sandbox
     volumes:
-      # qdcms framework (= the core, holds packages/ + tooling).
       - ../core:/core
-      # qdadm sibling repo — file: workspace dep target.
       - ../../qdadm:/qdadm
-      # The demo instance at /demo (the other world).
       - ../demo:/demo
-      # Sandbox-isolated state : data + compiled artefacts go to
-      # the sandbox's own folders, decoupled from the host's
-      # local state. Addressed via /demo (not /core/demo — that
-      # path exists incidentally, see comment block above).
       - ./demo/data:/demo/data
       - ./demo/.compiled:/demo/.compiled
-      # node_modules per workspace (cross-arch isolation).
       - qdcms-node-modules-core:/core/node_modules
       - qdcms-node-modules-demo:/demo/node_modules
       - qdadm-node-modules:/qdadm/node_modules
     working_dir: /core
+    # Direct port mapping kept for non-Traefik access (curl, CI).
     ports:
       - '${SANDBOX_FRONTEND_PORT:-5180}:5180'
       - '${SANDBOX_BACKEND_PORT:-5181}:5181'
     environment:
       - NODE_ENV=development
-      # The qdcms framework root inside the container.
       - QDCMS_CORE=/core
     command: ['tail', '-f', '/dev/null']
+    networks:
+      - default
+      - traefik
+    labels:
+      - traefik.enable=true
+      - dev.project=qdcms-sandbox
+      # Frontend route (Vite dev server on port 5180 in-container).
+      - traefik.http.routers.qdcms-sandbox-frontend.rule=Host(`demo-frontend.qdcms.localhost`)
+      - traefik.http.routers.qdcms-sandbox-frontend.entrypoints=web
+      - traefik.http.routers.qdcms-sandbox-frontend.service=qdcms-sandbox-frontend
+      - traefik.http.services.qdcms-sandbox-frontend.loadbalancer.server.port=5180
+      # Backend route (Express on port 5181 in-container).
+      - traefik.http.routers.qdcms-sandbox-backend.rule=Host(`demo-backend.qdcms.localhost`)
+      - traefik.http.routers.qdcms-sandbox-backend.entrypoints=web
+      - traefik.http.routers.qdcms-sandbox-backend.service=qdcms-sandbox-backend
+      - traefik.http.services.qdcms-sandbox-backend.loadbalancer.server.port=5181
+
+  traefik:
+    image: traefik:v3.6
+    container_name: qdcms-sandbox-traefik
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yaml:/etc/traefik/traefik.yaml:ro
+      - ./traefik/dynamic.yaml:/etc/traefik/dynamic.yaml:ro
+    ports:
+      - '${SANDBOX_HTTP_PORT:-80}:80'
+    networks:
+      - traefik
+    labels:
+      - traefik.enable=true
+      - dev.project=qdcms-sandbox
+      # Dashboard at http://traefik.qdcms.localhost
+      - traefik.http.routers.qdcms-sandbox-dashboard.rule=Host(`traefik.qdcms.localhost`)
+      - traefik.http.routers.qdcms-sandbox-dashboard.entrypoints=web
+      - traefik.http.routers.qdcms-sandbox-dashboard.service=api@internal
 
 volumes:
   qdcms-node-modules-core:
   qdcms-node-modules-demo:
   qdadm-node-modules:
+
+networks:
+  default:
+    name: sandbox_default
+  traefik:
+    name: sandbox_traefik
+    driver: bridge

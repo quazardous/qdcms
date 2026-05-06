@@ -43,11 +43,40 @@ make down          # tear down
 sandbox/
 ├── README.md                ← this file
 ├── Makefile                 ← driver — `make help` is the spec
-├── docker-compose.yml       ← single qdcms service (extensible)
+├── docker-compose.yml       ← qdcms + traefik services
 ├── Dockerfile               ← Node 22 + tooling
+├── traefik/
+│   ├── traefik.yaml         ← Traefik static config
+│   └── dynamic.yaml         ← Traefik dynamic config
 └── demo/
-    └── data/                ← sandbox-isolated SQLite (gitignored)
+    ├── data/                ← sandbox-isolated SQLite (gitignored)
+    └── .compiled/           ← sandbox-isolated compiled config
 ```
+
+## Multi-domain routing (Traefik)
+
+A bundled Traefik routes the sandbox over named subdomains so
+tests that care about cookie domains, auth redirect URLs, or
+multi-tenant scenarios get a realistic environment :
+
+| URL                                     | Routes to                |
+|---|---|
+| `http://demo-frontend.qdcms.localhost`  | qdcms:5180 (Vite dev)    |
+| `http://demo-backend.qdcms.localhost`   | qdcms:5181 (Express API) |
+| `http://traefik.qdcms.localhost`        | Traefik dashboard        |
+
+`*.localhost` auto-resolves to 127.0.0.1 in modern browsers
+(Chrome, Firefox, Safari) — no `/etc/hosts` edit needed. For
+curl, use `--resolve demo-frontend.qdcms.localhost:80:127.0.0.1`
+or a host alias.
+
+Direct ports (5180, 5181) are still mapped — useful for CI or
+when Traefik isn't part of the test.
+
+`make urls` prints the catalogue. TLS is off by default ; the
+traefik static config has the websecure entrypoint commented out
+behind a TODO. Add it (and certs) when a test specifically
+needs HTTPS.
 
 ## Volume layout — code shared, state isolated
 

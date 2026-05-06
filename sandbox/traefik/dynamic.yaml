@@ -1,0 +1,12 @@
+# sandbox/traefik/dynamic.yaml — dynamic config.
+#
+# Reserved for file-based routes that the docker provider can't
+# express (e.g. routes pointing to host-only services). Empty by
+# default ; the docker provider drives every sandbox route.
+#
+# Future hook : a `tls` section here would declare default
+# certificates for websecure once HTTPS is enabled.
+
+http:
+  routers: {}
+  services: {}

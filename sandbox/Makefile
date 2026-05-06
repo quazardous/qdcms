@@ -113,6 +113,19 @@ plugin-test: ## Run tests for a single plugin. Use: make plugin-test PLUGIN=qdcm
 
 # ─── Diagnostics ────────────────────────────────────────────────
 
+.PHONY: urls
+urls: ## Print the sandbox URLs (Traefik routes + direct ports)
+	@echo "Sandbox URLs (start with 'make up' first) :"
+	@echo "  Traefik routes (HTTP) :"
+	@echo "    Frontend  → http://demo-frontend.qdcms.localhost"
+	@echo "    Backend   → http://demo-backend.qdcms.localhost"
+	@echo "    Dashboard → http://traefik.qdcms.localhost"
+	@echo "  Direct ports (no Traefik) :"
+	@echo "    Frontend  → http://localhost:$${SANDBOX_FRONTEND_PORT:-5180}"
+	@echo "    Backend   → http://localhost:$${SANDBOX_BACKEND_PORT:-5181}"
+	@echo "  Note : *.qdcms.localhost auto-resolves to 127.0.0.1 in"
+	@echo "  modern browsers ; for curl, use --resolve or a host alias."
+
 .PHONY: doctor
 doctor: ## Run the full diagnostic suite (config doctor + tests)
 	$(EXEC) bash -lc 'set -e; \
