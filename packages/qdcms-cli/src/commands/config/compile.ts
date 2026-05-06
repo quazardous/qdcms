@@ -61,6 +61,7 @@ export default class ConfigCompile extends Command {
         ),
         outputs: result.outputs,
         warnings: result.warnings,
+        cache: result.cache,
         elapsedMs: elapsed,
       })
     } else {
@@ -68,10 +69,15 @@ export default class ConfigCompile extends Command {
         (acc, ns) => acc + Object.keys(ns).length,
         0,
       )
+      const cacheTag = result.cache.hit
+        ? ' [cache hit]'
+        : result.cache.skippedConcepts > 0
+          ? ` [${result.cache.skippedConcepts} concept(s) cached]`
+          : ''
       this.log(
         `[qdcms config:compile] ${conceptCount} concept(s) across ${
           Object.keys(result.namespaces).length
-        } namespace(s) → ${result.outputs.length} file(s) emitted in ${elapsed}ms`,
+        } namespace(s) → ${result.outputs.length} file(s) in ${elapsed}ms${cacheTag}`,
       )
       for (const [ns, concepts] of Object.entries(result.namespaces)) {
         this.log(`  ${ns} → ${Object.keys(concepts).join(', ')}`)

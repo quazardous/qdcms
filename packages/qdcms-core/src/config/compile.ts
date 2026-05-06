@@ -5,18 +5,15 @@
  * authoring shape (see docs/config.md §3.2), and emits typed TS
  * modules into `<outDir>` (default `<instanceDir>/.compiled`).
  *
- * Scope of THIS slice (C3+C4) :
- *  - file globbing (qdcms.*.yaml, plugin-*.yaml),
- *  - YAML parsing,
- *  - concept-named vs self-keyed normalisation,
- *  - duplicate-concept detection,
- *  - per-concept TS emission + index aggregator.
+ * Caching (slice C6) :
+ *  - Fast path : `max(mtime(*.yaml)) <= mtime(.cache.json)` →
+ *    no-op, return cached result. Sub-millisecond.
+ *  - Medium path : per-concept sha256(yaml). Validation + emit
+ *    skipped when hash matches the cached entry.
+ *  - Cold path : full parse, validate, emit, write new cache.
  *
  * Out of scope (future slices) :
- *  - schema discovery + validation (C5),
- *  - hash + timestamp cache (C6),
  *  - watch mode + Vite plugin (C7),
- *  - deprecation warnings (C8),
  *  - admin write-back / export-import (C9).
  */
 
@@ -24,6 +21,16 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join, resolve } from 'node:path'
 import { parse as parseYaml } from 'yaml'
 import { builtinSchemas } from './builtin-schemas'
+import {
+  CACHE_VERSION,
+  cacheStampMtime,
+  hashFile,
+  maxMtime,
+  readCache,
+  touchCacheStamp,
+  writeCache,
+  type CacheState,
+} from './cache'
 import type { NamespaceSchema } from './schema'
 import { validateConcept, type CompileWarning } from './validate'
 import type {
@@ -51,22 +58,39 @@ export async function compileConfig(
   }
 
   const files = listConfigFiles(instanceDir)
+  const noCache = options.noCache === true
+
+  // ─── Fast path : timestamp pre-check ────────────────────────────────────
+  if (!noCache) {
+    const stampMs = cacheStampMtime(outDir)
+    if (stampMs > 0) {
+      const inputsMaxMs = maxMtime(files)
+      const cached = readCache(outDir)
+      if (
+        cached &&
+        cached.version === CACHE_VERSION &&
+        Number.isFinite(inputsMaxMs) &&
+        inputsMaxMs <= stampMs
+      ) {
+        return cacheToResult(cached, outDir)
+      }
+    }
+  }
+
+  // ─── Slow path : parse + aggregate ──────────────────────────────────────
   const parsed = files.map(parseFile)
   const aggregated = aggregate(parsed)
 
-  // Schema registry : built-in framework schemas + (later) plugin
-  // schemas discovered via plugin manifests. The latter is wired in
-  // a follow-up slice (C5 cont.) once plugin discovery for SCHEMAS
-  // (not just runtime code) is plumbed.
+  // Schema registry : built-in + extra (plugin discovery later).
   const schemasByNamespace: Record<string, NamespaceSchema> = {}
   for (const s of [...builtinSchemas, ...(options.schemas ?? [])]) {
     schemasByNamespace[s.namespace] = s
   }
 
-  // Validate every concept against the schema for its namespace.
-  // Schema-less namespaces : pass-through (warn — proper plugins
-  // SHOULD ship a schema, but we don't break the build for partial
-  // setups during the migration).
+  // Validate every concept against the schema for its namespace,
+  // applying schema defaults to missing fields. Schema-less
+  // namespaces : pass-through (proper plugins SHOULD ship a schema,
+  // but partial setups still compile during the migration period).
   const validated: Record<string, Record<string, unknown>> = {}
   const warnings: CompileWarning[] = []
   for (const [ns, concepts] of Object.entries(aggregated)) {
@@ -74,9 +98,6 @@ export async function compileConfig(
     validated[ns] = {}
     for (const [concept, value] of Object.entries(concepts)) {
       if (!schema) {
-        // No schema known for this namespace — pass-through and
-        // emit a one-time note. Plugins should ship a schema ;
-        // until they do, the compile still works on raw YAML.
         validated[ns]![concept] = value
         continue
       }
@@ -87,9 +108,102 @@ export async function compileConfig(
   }
 
   mkdirSync(outDir, { recursive: true })
-  const outputs = emit(validated, outDir)
 
-  return { namespaces: validated, outputs, warnings }
+  // ─── Medium path : per-concept hash, skip emit when unchanged ──────────
+  const previousCache = noCache ? null : readCache(outDir)
+  const newCache: CacheState = {
+    version: CACHE_VERSION,
+    compiledAt: new Date().toISOString(),
+    concepts: {},
+    values: {},
+  }
+
+  const outputs: string[] = []
+  const indexExports: string[] = []
+  let skippedConcepts = 0
+
+  for (const [ns, concepts] of Object.entries(validated)) {
+    for (const [concept, value] of Object.entries(concepts)) {
+      const conceptKey = `${ns}.${concept}`
+      const filename = `${ns}.${concept}.ts`
+      const path = join(outDir, filename)
+      const sourcePath = sourceOf(parsed, ns, concept)
+      const inputHash = sourcePath.startsWith('(unknown')
+        ? null
+        : hashFile(sourcePath)
+
+      const cachedEntry = previousCache?.concepts[conceptKey]
+      const canSkipEmit =
+        !noCache &&
+        inputHash !== null &&
+        cachedEntry &&
+        cachedEntry.hash === inputHash &&
+        existsSync(path)
+
+      if (!canSkipEmit) {
+        writeFileSync(path, renderModule(ns, concept, value))
+      } else {
+        skippedConcepts++
+      }
+      outputs.push(path)
+      indexExports.push(
+        `export { default as ${jsId(ns, concept)} } from './${ns}.${concept}'`,
+      )
+
+      newCache.concepts[conceptKey] = {
+        hash: inputHash ?? '',
+        out: filename,
+      }
+      newCache.values![conceptKey] = value
+    }
+  }
+
+  // The aggregator index always rewrites — it depends on the full
+  // set of concepts, and is cheap.
+  const indexPath = join(outDir, 'index.ts')
+  writeFileSync(indexPath, renderIndex(indexExports))
+  outputs.push(indexPath)
+
+  // Persist cache + touch stamp.
+  if (!noCache) {
+    writeCache(outDir, newCache)
+    touchCacheStamp(outDir)
+  }
+
+  return {
+    namespaces: validated,
+    outputs: outputs.sort(),
+    warnings,
+    cache: { hit: false, skippedConcepts },
+  }
+}
+
+// ─── _internal: cache → result reconstruction ──────────────────────────────
+
+function cacheToResult(
+  cache: CacheState,
+  outDir: string,
+): CompileConfigResult {
+  const namespaces: Record<string, Record<string, unknown>> = {}
+  const outputs: string[] = []
+  for (const [conceptKey, entry] of Object.entries(cache.concepts)) {
+    const dot = conceptKey.indexOf('.')
+    // Namespaces themselves can contain dots only in the prefix
+    // form `plugin-<short>`, never inside ; conceptKey is
+    // unambiguous: split on the first dot.
+    const ns = conceptKey.slice(0, dot)
+    const concept = conceptKey.slice(dot + 1)
+    namespaces[ns] ??= {}
+    namespaces[ns]![concept] = cache.values?.[conceptKey] ?? null
+    outputs.push(join(outDir, entry.out))
+  }
+  outputs.push(join(outDir, 'index.ts'))
+  return {
+    namespaces,
+    outputs: outputs.sort(),
+    warnings: [],
+    cache: { hit: true, skippedConcepts: Object.keys(cache.concepts).length },
+  }
 }
 
 function sourceOf(
@@ -229,33 +343,7 @@ function aggregate(
   return out
 }
 
-// ─── _internal: emit .compiled/*.ts ────────────────────────────────────────
-
-function emit(
-  namespaces: Record<string, Record<string, unknown>>,
-  outDir: string,
-): string[] {
-  const outputs: string[] = []
-  const indexExports: string[] = []
-
-  for (const [ns, concepts] of Object.entries(namespaces)) {
-    for (const [concept, value] of Object.entries(concepts)) {
-      const filename = `${ns}.${concept}.ts`
-      const path = join(outDir, filename)
-      writeFileSync(path, renderModule(ns, concept, value))
-      outputs.push(path)
-      indexExports.push(
-        `export { default as ${jsId(ns, concept)} } from './${ns}.${concept}'`,
-      )
-    }
-  }
-
-  const indexPath = join(outDir, 'index.ts')
-  writeFileSync(indexPath, renderIndex(indexExports))
-  outputs.push(indexPath)
-
-  return outputs.sort()
-}
+// ─── _internal: emit helpers ────────────────────────────────────────────────
 
 function renderModule(ns: string, concept: string, value: unknown): string {
   return [

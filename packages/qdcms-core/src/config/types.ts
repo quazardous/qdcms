@@ -36,6 +36,13 @@ export interface CompileConfigOptions {
    * directly here.
    */
   schemas?: NamespaceSchema[]
+
+  /**
+   * Disable the compile cache (force a fresh recompile). Useful
+   * for CI gates that want to validate from scratch and for
+   * tests. Default false.
+   */
+  noCache?: boolean
 }
 
 export interface CompileConfigResult {
@@ -57,6 +64,17 @@ export interface CompileConfigResult {
    * through here so the caller can log/render them.
    */
   warnings: CompileWarning[]
+
+  /**
+   * Cache outcome. `hit: true` means the entire compile was a
+   * no-op (timestamp pre-check passed). `skippedConcepts` counts
+   * concepts whose per-concept hash matched the cache and didn't
+   * need a fresh emit.
+   */
+  cache: {
+    hit: boolean
+    skippedConcepts: number
+  }
 }
 
 /**
