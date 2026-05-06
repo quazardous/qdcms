@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { LocaleLink } from 'qdcms'
 import { useDemoEntity } from '../services'
-import type { Realization } from '../content/realizations'
+import type { Realization } from '../../content/realizations'
 
 const props = defineProps<{ slug?: string | null }>()
 

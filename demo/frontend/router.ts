@@ -7,7 +7,7 @@ import {
   type SlugTable,
   type StackLevelMetaTemplate,
 } from 'qdcms'
-import { LOCALES, DEFAULT_LOCALE, slugTable } from './config'
+import { LOCALES, DEFAULT_LOCALE, slugTable } from '../config'
 
 // Re-export so existing consumers (FrontShell.vue, install-qdadm.ts)
 // can keep importing from './router'. They'll migrate to './config'

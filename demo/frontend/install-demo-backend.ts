@@ -19,7 +19,7 @@
 
 import { createBrowserBackend } from '@quazardous/qdcms-backend/browser'
 import { installEmulator } from '@quazardous/qdcms-api-emulator'
-import { plugins, seed } from './config'
+import { plugins, seed } from '../config'
 
 const backend = createBrowserBackend({
   plugins,
