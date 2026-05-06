@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { compileConfig } from '../../src/config'
+import { builtinSchemas, compileConfig } from '../../src/config'
 
 function scratch(): { dir: string; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), 'qdcms-config-test-'))
@@ -130,7 +130,7 @@ describe('compileConfig', () => {
         join(dir, 'qdcms.locales.yaml'),
         `list: [en, fr]\ndefault: en\n`,
       )
-      const result = await compileConfig({ instanceDir: dir })
+      const result = await compileConfig({ instanceDir: dir, schemas: builtinSchemas })
       expect(result.namespaces.qdcms?.locales).toEqual({
         list: ['en', 'fr'],
         default: 'en',
@@ -150,9 +150,9 @@ describe('compileConfig', () => {
         join(dir, 'qdcms.locales.yaml'),
         `list: [en, 42]\n`,
       )
-      await expect(compileConfig({ instanceDir: dir })).rejects.toThrow(
-        /schema validation failed for 'qdcms\.locales'/,
-      )
+      await expect(
+        compileConfig({ instanceDir: dir, schemas: builtinSchemas }),
+      ).rejects.toThrow(/schema validation failed for 'qdcms\.locales'/)
     } finally {
       cleanup()
     }
@@ -174,7 +174,7 @@ describe('compileConfig', () => {
           ``,
         ].join('\n'),
       )
-      const result = await compileConfig({ instanceDir: dir })
+      const result = await compileConfig({ instanceDir: dir, schemas: builtinSchemas })
       const plugins = result.namespaces.qdcms?.plugins as unknown[]
       expect(Array.isArray(plugins)).toBe(true)
       expect(plugins).toHaveLength(1)
@@ -190,9 +190,9 @@ describe('compileConfig', () => {
         join(dir, 'qdcms.unknown.yaml'),
         `foo: bar\n`,
       )
-      await expect(compileConfig({ instanceDir: dir })).rejects.toThrow(
-        /unknown concept 'qdcms\.unknown'/,
-      )
+      await expect(
+        compileConfig({ instanceDir: dir, schemas: builtinSchemas }),
+      ).rejects.toThrow(/unknown concept 'qdcms\.unknown'/)
     } finally {
       cleanup()
     }

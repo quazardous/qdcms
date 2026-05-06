@@ -8,7 +8,8 @@
 
 import { Command, Flags } from '@oclif/core'
 import { resolve } from 'node:path'
-import { compileConfig } from '@quazardous/qdcms-core/config'
+import { ConfigModule } from '@quazardous/qdcms-core/config'
+import { Kernel, registerSources } from '@quazardous/qdcms-core/kernel'
 
 export default class Install extends Command {
   static override description =
@@ -36,11 +37,16 @@ export default class Install extends Command {
 
     const stages: Array<{ name: string; ms: number; ok: boolean; detail?: string }> = []
 
+    // Build a kernel + register the framework's modules. Plugin
+    // discovery joins here in a follow-up slice.
+    const kernel = new Kernel()
+    registerSources(kernel, { modules: [ConfigModule] })
+
     // Stage : config:compile.
     {
       const t0 = performance.now()
       try {
-        const r = await compileConfig({ instanceDir })
+        const r = await ConfigModule.compile({ instanceDir, kernel })
         stages.push({
           name: 'config:compile',
           ms: Math.round(performance.now() - t0),

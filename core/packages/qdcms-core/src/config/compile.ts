@@ -20,7 +20,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parse as parseYaml } from 'yaml'
-import { builtinSchemas } from './builtin-schemas'
 import {
   CACHE_VERSION,
   cacheStampMtime,
@@ -81,9 +80,13 @@ export async function compileConfig(
   const parsed = files.map(parseFile)
   const aggregated = aggregate(parsed)
 
-  // Schema registry : built-in + extra (plugin discovery later).
+  // Schema registry : whatever the caller passed. The framework's
+  // own builtinSchemas reach the compiler through ConfigModule
+  // registered on the Kernel — `compileConfig` itself stays
+  // schema-agnostic, owns no defaults. See `ConfigModule.compile`
+  // for the kernel-aware wrapper that 95% of consumers use.
   const schemasByNamespace: Record<string, NamespaceSchema> = {}
-  for (const s of [...builtinSchemas, ...(options.schemas ?? [])]) {
+  for (const s of options.schemas ?? []) {
     schemasByNamespace[s.namespace] = s
   }
 

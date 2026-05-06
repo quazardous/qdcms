@@ -7,7 +7,7 @@
 
 import { Args, Command, Flags } from '@oclif/core'
 import { basename, dirname, join, resolve } from 'node:path'
-import { ConfigModule, compileConfig } from '@quazardous/qdcms-core/config'
+import { ConfigModule } from '@quazardous/qdcms-core/config'
 import { Kernel, registerSources } from '@quazardous/qdcms-core/kernel'
 
 /**
@@ -67,18 +67,14 @@ export default class ConfigCompile extends Command {
     // Build the kernel and register every Module + Plugin source
     // the host knows about. Today : ConfigModule (statically imported)
     // — plugin discovery is additive once a real plugin needs loading.
-    // The kernel aggregates configSchemas across the whole topology
-    // so the compiler validates not just builtins but every
-    // contributor's namespaces.
+    // ConfigModule.compile aggregates configSchemas across the whole
+    // topology so every contributor's namespaces participate in
+    // validation.
     const kernel = new Kernel()
     registerSources(kernel, { modules: [ConfigModule] })
 
     const t0 = performance.now()
-    const result = await compileConfig({
-      instanceDir,
-      outDir,
-      schemas: kernel.collectConfigSchemas(),
-    })
+    const result = await ConfigModule.compile({ instanceDir, outDir, kernel })
     const elapsed = Math.round(performance.now() - t0)
 
     if (flags.json) {
