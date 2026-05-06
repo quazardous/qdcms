@@ -7,10 +7,12 @@
   "type": "module",
   "main": "src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./tsconfig.preset.json": "./tsconfig.preset.json"
   },
   "files": [
     "src",
+    "tsconfig.preset.json",
     "README.md",
     "LICENSE"
   ],
