@@ -8,6 +8,10 @@
  * schema contract, and compile pipeline behaviour.
  */
 
+export { ConfigModule } from './ConfigModule'
+
+export { builtinSchemas } from './builtin-schemas'
+
 export { compileConfig } from './compile'
 export type {
   CompileConfigOptions,

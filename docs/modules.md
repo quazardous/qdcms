@@ -22,35 +22,57 @@ standalone npm packages and follow a stricter contract called
 A Module instance lives in a **slot** of the Kernel registry,
 keyed by its `name`. Two kinds of citizenship :
 
-| Citizenship | Distribution                  | API access      | Contract         |
+| Citizenship | Discipline                                                                | API access      | Contract                  |
 |---|---|---|---|
-| **module**  | Part of qdcms-core (or another framework package) — imported directly | Can use internal qdcms-core APIs | Loose (just `Module` class) |
-| **plugin**  | Standalone npm package keyworded `qdcms-plugin` — discovered at boot | Public API only | Strict (`Plugin` interface) |
+| **module**  | Part of a framework package (qdcms-core or sibling) — imported directly   | Can use internal qdcms-core APIs | Loose (just `Module` class) |
+| **plugin**  | Public-API only ; satisfies the strict `Plugin` interface, validated at the boundary | Public API only | Strict (`Plugin` interface) |
 
 Both kinds use the same `Module` base class and the same Kernel
-lifecycle. The difference is **packaging + isolation discipline**,
-not behaviour.
+lifecycle. The difference is **isolation discipline**, not
+behaviour and not distribution.
 
 A plugin is the public version of a module — same mechanism,
 stricter contract.
 
+### Distribution is orthogonal
+
+A plugin can ship as :
+
+- a standalone npm package keyworded `qdcms-plugin` — the typical
+  case, discovered by the Kernel's npm-walking loader,
+- a workspace-internal package (linked via `file:`/workspaces, no
+  publish), discovered the same way as long as the keyword is
+  there,
+- a private file under an instance's `plugins/` directory, picked
+  up by a filesystem-scanning loader,
+- an explicit list in `qdcms.plugins.yaml` (or the bootstrap
+  code), bypassing discovery entirely.
+
+What makes something a plugin is the **shape + discipline** —
+the Plugin interface validated at the boundary — not the package
+manager that delivered it.
+
 ### Why distinguish
 
 - **Stability vs evolution** : modules are version-locked to the
-  framework ; plugins evolve at their own semver pace.
-- **Discovery surface** : the Kernel knows its own modules at
-  build time ; plugins are discovered from
-  `<QDCMS_CORE>/node_modules/` at boot.
+  framework ; plugins evolve at their own semver pace (whatever
+  cadence their loader/source dictates).
 - **Trust boundary** : modules can poke into qdcms-core
   internals ; plugins must stick to the public surface so
   framework refactors don't silently break them.
+- **Validation surface** : modules trust the framework to import
+  them correctly ; plugins are validated at the discovery
+  boundary (Valibot, see §8) because the loader can't trust
+  whoever produced the value.
 
 ### Promotion path
 
 A module can be **promoted to a plugin** when external
-alternatives become useful : extract its impl into its own npm
-package, mark it as `qdcms-plugin`, version it independently. The
-Module's class doesn't change ; its packaging does.
+alternatives become useful : extract its impl into its own
+package (npm-published or workspace-internal), expose it through
+the Plugin interface, version it independently. The Module's
+class doesn't change ; its packaging + the discipline around
+it does.
 
 The reverse — **demoting a plugin to a module** — happens when a
 plugin's behaviour becomes considered framework-essential and
