@@ -3,9 +3,30 @@
 **Status**: living document · **Last updated**: 2026-05-06
 
 This document maps what qdcms should become beyond the current POC.
-It's not frozen — each shipped slice updates the corresponding axis.
-Settled decisions are flagged as such; the rest is left in the
-*Open questions* section.
+It's not frozen — when a slice ships, its essence moves to
+[`CHANGELOG.md`](../CHANGELOG.md) and the corresponding section
+here is trimmed so the doc keeps pointing forward. Settled decisions
+are flagged as such ; the rest sits in the *Open questions* section.
+
+## Foundations already in place
+
+The architectural plumbing every axis below sits on is shipped — see
+[`CHANGELOG.md`](../CHANGELOG.md) for the synthetic version :
+
+- **Module / Plugin contract** + **Kernel** with chain-of-replacers
+  semantics (qdcms-core 0.3.0). `docs/modules.md` is the canonical
+  design.
+- **ConfigModule** — kernel-aware `compile` pipeline, central hub
+  for high-level config (sharing + override + admin UI in forward
+  direction).
+- **DCModule** — skeleton on the kernel ; full entities + sync +
+  HTTP routes are the next slices of Axis 2.
+- **CLI** — `qdcms config:compile` / `:doctor` / `install` driven
+  by the kernel.
+- **Sandbox** — Docker + Traefik + nginx topology rehearsal +
+  HTTPS via mkcert.
+- **Demo classic-backend mode** — `packages/demo-backend-server` +
+  Vite proxy ; both modes run on the same handle.
 
 ---
 
@@ -300,8 +321,12 @@ produces ; without it the framework's content model has no
 backbone. **Hybrid** types : statically-declared by the module
 seed coexist with admin-created ones at runtime.
 
-- Inside `qdcms-core`, register `DCModule extends Module` with
-  `static moduleName = 'dc'`, `static requires = ['config']`.
+**Skeleton shipped** (qdcms-core 0.3.0) : `DCModule extends Module`
+registered on the kernel, `dc.types` config schema. Real entities +
+install seeding + HTTP routes follow.
+
+Remaining work :
+
 - Entities:
   - `dc_type` — declares a DC type (name, fields schema, URL pattern
     template, default layout),
@@ -735,48 +760,14 @@ critical path.
 
 ---
 
-### Axis 7 — Classic backend mode (real Node server) — **priority**
+### Axis 7 — Classic backend mode (real Node server)
 
-**Goal**: the demo runs end-to-end against a real HTTP server with
-**one env var change** (no code edits, no rebuild). Today the
-in-browser backend works; the classic toggle exists in
-`qdcms.config.ts` (`VITE_QDCMS_BACKEND_MODE=remote`) but the
-Node server side doesn't exist yet.
-
-What's needed:
-
-- New package `packages/demo-backend-server` — Express (or
-  Fastify) wrapping the existing Node `createBackend` factory:
-  - mounts `/api/qdcms/*` and dispatches to `backend.handle(req)`,
-  - reads `QDCMS_DB` env var (sqlite path / mariadb DSN / …),
-  - reads the same `plugins` list as the demo SPA (shared
-    `qdcms.config.ts` import), so DC types / seeds align,
-  - runs the migration runner at boot.
-- `vite.config.ts` proxy in the demo — when
-  `VITE_QDCMS_BACKEND_MODE=remote`, forward `/api/qdcms/*` to the
-  Node server (`http://localhost:<api-port>`).
-- npm scripts:
-  - `npm run server` — boots the Node server (separate process),
-  - `npm run dev:full` — runs `concurrently` server + Vite SPA
-    (one command for the whole stack).
-- Smoke-test the toggle round-trip:
-  - default (`VITE_QDCMS_BACKEND_MODE=browser` or unset) → in-tab
-    backend, no server needed,
-  - `VITE_QDCMS_BACKEND_MODE=remote` → proxy hits the Node server,
-    `npm run server` must be running,
-  - flip back and forth without code edits.
-- Bonus parity check: the same Vite build works in either mode
-  (in `remote` mode the in-browser bridge graph drops out — this
-  was already verified at ~10 kB gzipped diff).
-
-This axis closes the loop on the IoC story: "the demo natively
-supports both modes" stops being a comment in `bootstrap.ts` and
-becomes a runnable, smoke-tested truth.
-
-Depends on: nothing — can start now. Doesn't depend on axes 1-6;
-their absence just means the server serves the same static
-hardcoded entities the SPA today serves via the in-browser
-bridge.
+**Shipped** — see [`CHANGELOG.md`](../CHANGELOG.md) (qdcms 0.2.0).
+`packages/demo-backend-server` wraps `createBackend` ; the demo's
+Vite proxy forwards `/api/qdcms/*` when `VITE_QDCMS_BACKEND_MODE=
+remote`. Both modes round-trip without code edits. The IoC story
+closes : "the demo natively supports both modes" stopped being a
+TODO and became a smoke-tested truth.
 
 ---
 
@@ -796,7 +787,7 @@ Axis 1 (Page Type) ──┬─→ Axis 2 (DC Module)
 Axis 4 (theme tokens L1+L2) — independent, can start
 Axis 5 — independent, interleavable
 Axis 6 (Menus) — depends on 0, 0bis, 1; useful with 2
-Axis 7 (Classic backend server) — independent, PRIORITY
+Axis 7 (Classic backend server) — ✓ shipped (see CHANGELOG)
 ```
 
 - **Axes 0 and 0bis** are transversal: every following axis must
@@ -808,9 +799,6 @@ Axis 7 (Classic backend server) — independent, PRIORITY
   (to wire the switcher into the composer).
 - **Axis 6** depends on axis 1 (page-type → URL resolver per
   locale). DC instance link targets in menus require axis 2.
-- **Axis 7** is independent and **priority**: closes the
-  in-browser ↔ classic toggle by shipping the missing Node
-  server side.
 
 ---
 
