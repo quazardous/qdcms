@@ -41,18 +41,26 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        DEMO_UID: ${DEMO_UID:-1000}
+        DEMO_GID: ${DEMO_GID:-1000}
     image: qdcms-sandbox:dev
     container_name: qdcms-sandbox
+    user: '${DEMO_UID:-1000}:${DEMO_GID:-1000}'
     volumes:
       - ../core:/core
       - ../../qdadm:/qdadm
       - ../demo:/demo
       - ./demo/data:/demo/data
       - ./demo/.compiled:/demo/.compiled
-      - qdcms-node-modules-core:/core/node_modules
-      - qdcms-node-modules-demo:/demo/node_modules
-      - qdadm-node-modules:/qdadm/node_modules
-    working_dir: /core
+      # Note on node_modules : we share the host's via the bind
+      # mounts above (no named volumes). Container runs as the
+      # host user so writes go through, and on linux-x64 the
+      # native modules (better-sqlite3) match the host's.
+      # If you ever sandbox on a different arch, switch back
+      # to named volumes + an init container that chowns them
+      # to ${UID}:${GID} at first run.
+    working_dir: /demo
     # Direct port mapping kept for non-Traefik access (curl, CI).
     ports:
       - '${SANDBOX_FRONTEND_PORT:-5180}:5180'
@@ -124,11 +132,6 @@ services:
       - traefik.http.routers.qdcms-sandbox-dashboard.rule=Host(`traefik.qdcms.localhost`)
       - traefik.http.routers.qdcms-sandbox-dashboard.entrypoints=web
       - traefik.http.routers.qdcms-sandbox-dashboard.service=api@internal
-
-volumes:
-  qdcms-node-modules-core:
-  qdcms-node-modules-demo:
-  qdadm-node-modules:
 
 networks:
   default:

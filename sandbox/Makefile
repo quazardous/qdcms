@@ -8,6 +8,14 @@
 # (qdcms framework) and /demo (instance). WORKDIR=/core so the
 # `qdcms` bin from /core/node_modules/.bin is on PATH.
 
+# DEMO_UID/DEMO_GID match the host user so files written to the
+# bind mounts (package-lock.json, .compiled/, dist/) stay owned
+# by the developer, not root. Using DEMO_-prefixed names rather
+# than the bare UID/GID avoids clashing with shell built-ins
+# (UID is read-only on Linux) or other tooling that reads them.
+export DEMO_UID := $(shell id -u)
+export DEMO_GID := $(shell id -g)
+
 DOCKER_COMPOSE ?= docker compose --env-file ./docker-compose.env
 SERVICE        ?= qdcms
 
@@ -75,7 +83,8 @@ shell: ## Drop into an interactive bash shell in the sandbox
 	$(EXEC_TTY) bash
 
 .PHONY: install-deps
-install-deps: ## npm install in /core then /demo (the two worlds)
+install-deps: ## npm install in /qdadm, /core, /demo (sibling repo + two worlds)
+	$(EXEC) sh -lc 'cd /qdadm && npm install'
 	$(EXEC) sh -lc 'cd /core && npm install'
 	$(EXEC) sh -lc 'cd /demo && npm install'
 
