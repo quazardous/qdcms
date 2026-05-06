@@ -13,17 +13,6 @@
 #  - /demo/data       ← bound from sandbox/demo/data
 #  - /demo/.compiled  ← bound from sandbox/demo/.compiled
 #
-# Note on /core/demo : the host's qdcms repo carries `demo/` as a
-# workspace sub-folder for dev convenience (one `npm install`
-# wires both qdcms packages and the demo). This means /core/demo
-# is visible inside the container as a side effect of the
-# `..:/core` bind mount — it's NOT a deliberate cross-world
-# coupling. The sandbox's CLI and Makefile address the demo via
-# /demo only ; treat /core/demo as "exists for npm workspace
-# resolution, do not reference". A future slice will pull the
-# demo out of the repo's workspaces array so this leak
-# disappears.
-#
 # Future hook : a config overlay (sandbox-specific YAML
 # overriding the demo's config) would slot in here as additional
 # bind mounts at /demo/config/<file>.yaml. Defer until needed.
@@ -39,12 +28,9 @@ services:
     image: qdcms-sandbox:dev
     container_name: qdcms-sandbox
     volumes:
-      # qdcms repo (= the core).
-      - ../:/core
-      # qdadm sibling repo — needed for the demo's file: workspace
-      # deps to resolve in-container. The path layout matches the
-      # host (qdcms and qdadm as siblings) so npm's relative
-      # symlinks Just Work.
+      # qdcms framework (= the core, holds packages/ + tooling).
+      - ../core:/core
+      # qdadm sibling repo — file: workspace dep target.
       - ../../qdadm:/qdadm
       # The demo instance at /demo (the other world).
       - ../demo:/demo
@@ -55,9 +41,8 @@ services:
       - ./demo/data:/demo/data
       - ./demo/.compiled:/demo/.compiled
       # node_modules per workspace (cross-arch isolation).
-      - qdcms-node-modules-root:/core/node_modules
-      - qdcms-node-modules-frontend:/core/demo/frontend/node_modules
-      - qdcms-node-modules-backend:/core/demo/backend/node_modules
+      - qdcms-node-modules-core:/core/node_modules
+      - qdcms-node-modules-demo:/demo/node_modules
       - qdadm-node-modules:/qdadm/node_modules
     working_dir: /core
     ports:
@@ -70,7 +55,6 @@ services:
     command: ['tail', '-f', '/dev/null']
 
 volumes:
-  qdcms-node-modules-root:
-  qdcms-node-modules-frontend:
-  qdcms-node-modules-backend:
+  qdcms-node-modules-core:
+  qdcms-node-modules-demo:
   qdadm-node-modules:

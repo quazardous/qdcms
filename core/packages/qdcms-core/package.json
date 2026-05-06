@@ -29,7 +29,7 @@
     "@mikro-orm/core": "^6.6.14",
     "@mikro-orm/migrations": "^6.6.14",
     "@mikro-orm/sqlite": "^6.6.14",
-    "@quazardous/qdcore": "file:../../../qdadm/packages/qdcore",
+    "@quazardous/qdcore": "file:../../../../qdadm/packages/qdcore",
     "better-sqlite3": "^12.9.0",
     "semver": "^7.7.4",
     "valibot": "^1.4.0",

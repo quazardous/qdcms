@@ -4,23 +4,21 @@
 # wrapper around docker compose + a command inside the container,
 # so the same actions are reproducible across machines.
 #
-# Once `packages/qdcms-cli/` ships (see docs/cli.md), the inner
-# command set will be `qdcms <topic>:<cmd>` rather than the tsx
-# / npm-script scaffolding used here today.
+# Inside the container, the two worlds are mounted at /core
+# (qdcms framework) and /demo (instance). WORKDIR=/core so the
+# `qdcms` bin from /core/node_modules/.bin is on PATH.
 
-# ─── Convenience ────────────────────────────────────────────────
-
-# Use docker compose v2. Override DOCKER_COMPOSE for non-standard envs.
 DOCKER_COMPOSE ?= docker compose
-COMPOSE_FILE   ?= docker-compose.yml
-
-# The service name from docker-compose.yml.
 SERVICE        ?= qdcms
 
-# In-container exec wrapper. Adds an interactive TTY only when the
-# host has one (CI servers don't), otherwise stdin-only.
-EXEC = $(DOCKER_COMPOSE) exec -T $(SERVICE)
+EXEC     = $(DOCKER_COMPOSE) exec -T $(SERVICE)
 EXEC_TTY = $(DOCKER_COMPOSE) exec $(SERVICE)
+
+# Helpers — run a command from /core or /demo regardless of
+# WORKDIR. The host-side `cd ...` would change ours ; these run
+# inside the container.
+EXEC_CORE = $(EXEC) sh -c
+EXEC_DEMO = $(EXEC) sh -lc 'cd /demo &&'
 
 .DEFAULT_GOAL := help
 
@@ -65,25 +63,27 @@ shell: ## Drop into an interactive bash shell in the sandbox
 	$(EXEC_TTY) bash
 
 .PHONY: install-deps
-install-deps: ## Run `npm install` against the mounted repo
-	$(EXEC) npm install
+install-deps: ## npm install in /core then /demo (the two worlds)
+	$(EXEC) sh -lc 'cd /core && npm install'
+	$(EXEC) sh -lc 'cd /demo && npm install'
 
 .PHONY: compile-config
-compile-config: ## Compile demo/config/*.yaml into .compiled/
-	$(EXEC) npx qdcms config:compile demo/config
+compile-config: ## Compile /demo/config/*.yaml into /demo/.compiled/config
+	$(EXEC) sh -lc 'cd /demo && npx qdcms config:compile config'
 
 .PHONY: typecheck
-typecheck: ## Run vue-tsc + tsc across all workspaces
-	$(EXEC) npm run build --workspaces --if-present
+typecheck: ## Run typechecks across both worlds
+	$(EXEC) sh -lc 'cd /core && npm run build --workspaces --if-present'
+	$(EXEC) sh -lc 'cd /demo && npm run build --workspaces --if-present'
 
 .PHONY: test
-test: ## Run all workspace tests
-	$(EXEC) npm test --workspaces --if-present
+test: ## Run all workspace tests in /core
+	$(EXEC) sh -lc 'cd /core && npm test --workspaces --if-present'
 
 .PHONY: install
 install: ## Full install pipeline : deps + qdcms install + typecheck + test
 	$(MAKE) install-deps
-	$(EXEC) npx qdcms install --instance demo/config
+	$(EXEC) sh -lc 'cd /demo && npx qdcms install --instance config'
 	$(MAKE) typecheck
 	$(MAKE) test
 
@@ -91,15 +91,15 @@ install: ## Full install pipeline : deps + qdcms install + typecheck + test
 
 .PHONY: demo-frontend
 demo-frontend: ## Run the demo frontend dev server (Vite, host :5180)
-	$(EXEC_TTY) npm run dev --workspace=demo-frontend
+	$(EXEC_TTY) sh -lc 'cd /demo && npm run dev --workspace=demo-frontend'
 
 .PHONY: demo-backend
 demo-backend: ## Run the demo backend dev server (Express, host :5181)
-	$(EXEC_TTY) npm run dev --workspace=demo-backend-server
+	$(EXEC_TTY) sh -lc 'cd /demo && npm run dev --workspace=demo-backend-server'
 
 .PHONY: demo-full
-demo-full: ## Run both demo servers concurrently (requires `up` first)
-	$(EXEC_TTY) npm run dev:full
+demo-full: ## Run both demo servers concurrently
+	$(EXEC_TTY) sh -lc 'cd /demo && npm run dev:full'
 
 # ─── Plugin author harness ──────────────────────────────────────
 
@@ -109,7 +109,7 @@ plugin-test: ## Run tests for a single plugin. Use: make plugin-test PLUGIN=qdcm
 	  echo "Usage: make plugin-test PLUGIN=<plugin-pkg-name>"; \
 	  exit 64; \
 	fi
-	$(EXEC) npm test --workspace=$(PLUGIN)
+	$(EXEC) sh -lc 'cd /core && npm test --workspace=$(PLUGIN)'
 
 # ─── Diagnostics ────────────────────────────────────────────────
 
@@ -118,6 +118,6 @@ doctor: ## Run the full diagnostic suite (config doctor + tests)
 	$(EXEC) bash -lc 'set -e; \
 	  echo "[doctor] Node: $$(node --version)"; \
 	  echo "[doctor] npm: $$(npm --version)"; \
-	  echo "[doctor] qdcms config:doctor:"; npx qdcms config:doctor demo/config 2>&1 | sed "s/^/  /"; \
-	  echo "[doctor] tests:"; npm test --workspaces --if-present 2>&1 | tail -5 | sed "s/^/  /"; \
+	  echo "[doctor] qdcms config:doctor:"; cd /demo && npx qdcms config:doctor config 2>&1 | sed "s/^/  /"; \
+	  echo "[doctor] tests:"; cd /core && npm test --workspaces --if-present 2>&1 | tail -5 | sed "s/^/  /"; \
 	  echo "[doctor] OK"'

@@ -99,7 +99,7 @@ groups what naturally goes together without forcing a hard
 division on packages that legitimately serve both sides.
 
 ```
-qdcms/
+qdcms/                                 ← repo root (umbrella ; no package.json)
 ├── docs/                              ← architecture & design docs
 │   ├── plugins.md                     ← plugin model contract
 │   ├── roadmap.md                     ← living roadmap
@@ -108,71 +108,57 @@ qdcms/
 │   ├── cli.md                         ← qdcms CLI design (oclif-based)
 │   ├── instance-anatomy.md            ← how an instance is shaped
 │   └── qdadm-vue-dedup.md             ← cross-repo dev note
-├── scripts/                           ← repo-level dev tooling
 ├── sandbox/                           ← reproducible Docker env
 │   ├── README.md
 │   ├── Makefile                       ← `make help` lists every target
 │   ├── docker-compose.yml
 │   └── Dockerfile
 │
-├── packages/                          ← LIBRARIES (publishable)
-│   │
-│   ├── ── transversal (env-agnostic, both sides) ──
-│   │
-│   ├── qdcms-core/                    ← entity, plugin, migration contracts.
-│   │                                    No HTTP, no Vue, no Node, no DB.
-│   ├── plugins/                       ← qdcms-aware npm packages (dual-citizen)
-│   │   ├── qdcms-plugin-core/         ← users, sessions (foundation)
-│   │   ├── qdcms-plugin-dc/           ← dynamic content (future)
-│   │   └── qdcms-plugin-media/        ← files / images (future)
-│   ├── themes/                        ← CSS + optional layout overrides
-│   │   ├── qdcms-theme-base/          ← CSS variables baseline
-│   │   └── qdcms-theme-*/             ← additional themes
-│   │
-│   ├── ── frontend (browser runtime + bootstrap) ──
-│   │
-│   ├── frontend/
-│   │   ├── qdcms/                     ← block/zone/page composer + Vue
-│   │   │                                registries + components
-│   │   ├── qdcms-frontend/            ← ApiFrontendStorage + composables
-│   │   ├── qdcms-api-emulator/        ← fetch interceptor for in-tab mode
-│   │   └── qdcms-spa-shell/           ← Vue/SPA shell (4-layer pattern,
-│   │                                    zone shells, debug bridge)
-│   │
-│   └── ── backend (Node runtime + bootstrap) ──
-│       │
-│       └── backend/
-│           ├── qdcms-backend/         ← createBackend (Node, MikroORM,
-│           │                            plugin discovery via node_modules)
-│           │   └── ./browser          ← MemoryStore + dispatcher for
-│           │                            in-tab usage (subpath export)
-│           └── qdcms-backend-server/  ← Express/HTTP shell
-│                                        (reusable, used by every host)
+├── core/                              ← THE FRAMEWORK (= QDCMS_CORE)
+│   ├── package.json                   ← workspaces: ["packages/*"]
+│   ├── scripts/                       ← repo-level dev tooling
+│   └── packages/                      ← LIBRARIES (publishable)
+│       ├── qdcms-core/                ← entity, plugin, migration contracts.
+│       │                                No HTTP, no Vue, no Node, no DB.
+│       ├── qdcms-cli/                 ← `qdcms` CLI (oclif, plugin-extensible)
+│       ├── qdcms/                     ← Vue 3 block/zone/page composer
+│       ├── qdcms-frontend/            ← ApiFrontendStorage + composables
+│       ├── qdcms-api-emulator/        ← fetch interceptor for in-tab mode
+│       ├── qdcms-backend/             ← createBackend (Node, MikroORM)
+│       ├── qdcms-backend-server/      ← Express/HTTP shell
+│       └── qdcms-plugin-core/         ← users, sessions (foundation plugin)
 │
-└── examples/                          ← SAMPLE CONSUMERS (dev aid, not a deliverable)
-    ├── demo/                          ← Flower Craft SPA (frontend example)
-    └── demo-backend-server/           ← Flower Craft Node server (backend example)
+└── demo/                              ← THE DEMO INSTANCE (the other world)
+    ├── package.json                   ← workspaces: ["frontend", "backend"]
+    │                                    file: links → ../core/packages/*
+    ├── config/                        ← *.yaml, .compiled/ (gitignored)
+    ├── content/                       ← seed data
+    ├── data/                          ← sqlite (gitignored)
+    ├── frontend/                      ← SPA workspace
+    └── backend/                       ← Node server workspace
 ```
 
-The `package.json` workspace globs cover all the workspace roots :
+The two worlds (`core/` and `demo/`) are siblings under the repo
+root, never nested. The sandbox mounts each at its own container
+path (`/core` and `/demo`) without overlap.
 
-```json
-{
-  "workspaces": [
-    "packages/*",
-    "packages/*/*",
-    "examples/*"
-  ]
-}
+Two `package.json`s, one per world :
+
+```jsonc
+// core/package.json
+{ "workspaces": ["packages/*"] }
+
+// demo/package.json
+{ "workspaces": ["frontend", "backend"] }
 ```
 
-The `examples/` folder is a **convenience** for the qdcms repo's
-own dev cycle — you can build a feature against a working
-consumer without leaving the repo. It is not part of what qdcms
-ships. A real customer site lives in the customer's own
-repository, with whatever folder shape they prefer ; from
-qdcms's point of view the only contract is the public API of the
-shell packages.
+`core/` is published as a set of npm packages (`@quazardous/qdcms-*`,
+`qdcms`, `qdcms-cli`, …). `demo/` is one example of a consumer ;
+its `package.json` declares file: links to the core's packages so
+local dev works without npm publishing. A real customer site has
+the same shape as `demo/`, in its own repo, with regular npm
+deps on the published packages — qdcms's only contract is the
+public API of those packages.
 
 Logic of the grouping inside `packages/` :
 

@@ -1,21 +1,18 @@
 {
-  "name": "qdcms-monorepo",
+  "name": "demo-instance",
   "private": true,
   "type": "module",
+  "description": "Flower Craft demo — qdcms instance umbrella (frontend + backend).",
   "workspaces": [
-    "packages/*",
-    "demo/frontend",
-    "demo/backend"
+    "frontend",
+    "backend"
   ],
   "scripts": {
     "dev": "npm run dev --workspace=demo-frontend",
     "dev:remote": "VITE_QDCMS_BACKEND_MODE=remote npm run dev --workspace=demo-frontend",
     "dev:server": "npm run dev --workspace=demo-backend-server",
     "dev:full": "concurrently --names server,spa --prefix-colors blue,magenta \"npm:dev:server\" \"npm:dev:remote\"",
-    "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
-    "dedup": "bash scripts/dedup-qdadm-vue.sh",
-    "postinstall": "bash scripts/dedup-qdadm-vue.sh || true"
+    "build": "npm run build --workspaces --if-present"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

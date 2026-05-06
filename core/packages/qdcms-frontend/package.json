@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@quazardous/qdcms-core": "^0.2.0",
-    "@quazardous/qdcore": "*"
+    "@quazardous/qdcore": "file:../../../../qdadm/packages/qdcore"
   },
   "peerDependencies": {
     "vue": "^3.3.0"

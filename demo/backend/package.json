@@ -9,8 +9,8 @@
     "start": "tsx server.ts"
   },
   "dependencies": {
-    "@quazardous/qdcms-backend-server": "*",
-    "@quazardous/qdcms-plugin-core": "*"
+    "@quazardous/qdcms-backend-server": "file:../../core/packages/qdcms-backend-server",
+    "@quazardous/qdcms-plugin-core": "file:../../core/packages/qdcms-plugin-core"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

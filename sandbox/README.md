@@ -55,7 +55,7 @@ Inside the container :
 
 | Container path | Mounted from           | Purpose                                |
 |---|---|---|
-| `/core`        | `../` (qdcms repo)     | The framework code (= QDCMS_CORE)      |
+| `/core`        | `../core`              | The framework code (= QDCMS_CORE)      |
 | `/demo`        | `../demo`              | The instance (the other world)         |
 | `/qdadm`       | `../../qdadm`          | Sibling repo, target of file: deps     |
 | `/demo/data`   | `./demo/data`          | **Sandbox-isolated** SQLite + journals |
@@ -66,12 +66,10 @@ Code edits flow back to the host (mounted read/write). State —
 SQLite files, compiled artefacts — stays inside the sandbox so a
 `make install` doesn't trample the host's local state.
 
-`/core/demo` exists incidentally inside the container (the host
-repo carries `demo/` as a workspace sub-folder for dev
-convenience). The CLI and Makefile address the demo via `/demo`
-only ; `/core/demo` is a workspace-resolution side effect, not a
-deliberate cross-world path. Pulling the demo out of the repo's
-workspaces array is on the to-do list.
+The two-worlds split (instance vs core) is materialised on disk :
+`./core/` is the qdcms repo, `./demo/` is the instance, they are
+siblings. The container mounts them at separate paths with no
+overlap.
 
 ## Services
 
