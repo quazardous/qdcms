@@ -4,12 +4,14 @@
 #  - Node 22 (LTS), matches local dev.
 #  - npm + git + bash + make + curl available for tooling.
 #  - SQLite client + libs for ad-hoc DB inspection.
-#  - Repo mounted at /core, /demo, /qdadm by docker-compose ;
-#    nothing baked into the image.
-#  - Container processes run as the HOST user (UID/GID injected
-#    by docker-compose) so files written into the bind mounts
-#    are owned by the host user, not root. The Makefile passes
-#    `id -u` / `id -g` automatically.
+#  - Repo source mounted at /core, /demo, /qdadm by docker-compose ;
+#    node_modules ride in named docker volumes (container-isolated,
+#    host stays untouched).
+#  - Container runs as `homer` (UID/GID matching the host's user
+#    via DEMO_UID/DEMO_GID build args). The image pre-creates the
+#    node_modules mount points owned by homer so docker's named-
+#    volume init inherits homer ownership — no entrypoint chown
+#    needed.
 
 FROM node:22-bookworm-slim
 
@@ -43,8 +45,6 @@ RUN groupmod -n homer node && \
     fi && \
     chown -R "${DEMO_UID}:${DEMO_GID}" /home/homer /usr/local/lib/node_modules
 
-# Use bash, not the Debian sh, for sandbox shells. Make/Compose
-# scripts rely on bashisms here and there.
 SHELL ["/bin/bash", "-lc"]
 
 # Tooling that's universally useful and small.
@@ -52,14 +52,11 @@ RUN npm install -g \
       tsx@4 \
       pnpm@9
 
-# Run as the host user — files written via bind mounts stay
-# owned by the host's UID/GID instead of root.
-USER homer
-# WORKDIR is /demo : the sandbox is about running the instance.
-# Targets that operate on the core (tests, dedup) `cd /core`
-# explicitly in the Makefile.
-WORKDIR /demo
+# Pre-create the named-volume mount points owned by homer so the
+# named volume's initial state inherits the right ownership.
+RUN mkdir -p /core/node_modules /demo/node_modules /qdadm/node_modules \
+ && chown -R "${DEMO_UID}:${DEMO_GID}" /core /demo /qdadm
 
-# Default to a friendly shell ; the Makefile overrides for
-# specific commands.
+USER homer
+WORKDIR /demo
 CMD ["bash"]
