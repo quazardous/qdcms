@@ -8,6 +8,9 @@
 export { Kernel } from './Kernel'
 export type { RegisterModuleOptions, RegisterPluginOptions } from './Kernel'
 
+export { registerSources } from './load'
+export type { KernelSources, ModuleSource } from './load'
+
 export type { ChainEntry, Citizenship, Slot } from './types'
 
 export {

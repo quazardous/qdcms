@@ -14,7 +14,8 @@
 
 import { Args, Command, Flags } from '@oclif/core'
 import { basename, dirname, join, resolve } from 'node:path'
-import { compileConfig } from '@quazardous/qdcms-core/config'
+import { ConfigModule, compileConfig } from '@quazardous/qdcms-core/config'
+import { Kernel, registerSources } from '@quazardous/qdcms-core/kernel'
 
 function defaultOutDir(instanceDir: string): string {
   return join(dirname(instanceDir), '.compiled', basename(instanceDir))
@@ -58,12 +59,19 @@ export default class ConfigDoctor extends Command {
     )
     const outDir = defaultOutDir(instanceDir)
 
+    // Build the kernel + register sources so every Module / Plugin's
+    // configSchemas flow into the compile (see config:compile for
+    // the rationale).
+    const kernel = new Kernel()
+    registerSources(kernel, { modules: [ConfigModule] })
+
     const t0 = performance.now()
     let result
     try {
       result = await compileConfig({
         instanceDir,
         outDir,
+        schemas: kernel.collectConfigSchemas(),
         // Doctor forces noCache so cache hits don't mask the very
         // warnings doctor exists to surface. CI gates always want
         // fresh data.

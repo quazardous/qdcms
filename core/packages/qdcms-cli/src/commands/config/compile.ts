@@ -7,7 +7,8 @@
 
 import { Args, Command, Flags } from '@oclif/core'
 import { basename, dirname, join, resolve } from 'node:path'
-import { compileConfig } from '@quazardous/qdcms-core/config'
+import { ConfigModule, compileConfig } from '@quazardous/qdcms-core/config'
+import { Kernel, registerSources } from '@quazardous/qdcms-core/kernel'
 
 /**
  * Default compiled-output location follows the umbrella
@@ -63,8 +64,21 @@ export default class ConfigCompile extends Command {
     )
     const outDir = flags.out ? resolve(flags.out) : defaultOutDir(instanceDir)
 
+    // Build the kernel and register every Module + Plugin source
+    // the host knows about. Today : ConfigModule (statically imported)
+    // — plugin discovery is additive once a real plugin needs loading.
+    // The kernel aggregates configSchemas across the whole topology
+    // so the compiler validates not just builtins but every
+    // contributor's namespaces.
+    const kernel = new Kernel()
+    registerSources(kernel, { modules: [ConfigModule] })
+
     const t0 = performance.now()
-    const result = await compileConfig({ instanceDir, outDir })
+    const result = await compileConfig({
+      instanceDir,
+      outDir,
+      schemas: kernel.collectConfigSchemas(),
+    })
     const elapsed = Math.round(performance.now() - t0)
 
     if (flags.json) {
