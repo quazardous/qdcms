@@ -10,6 +10,7 @@
     ".": "./src/index.ts",
     "./config": "./src/config/index.ts",
     "./entity": "./src/entity/index.ts",
+    "./kernel": "./src/kernel/index.ts",
     "./module": "./src/module/index.ts",
     "./plugin": "./src/plugin/index.ts",
     "./registry": "./src/registry/index.ts",
