@@ -23,6 +23,9 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { parse as parseYaml } from 'yaml'
+import { builtinSchemas } from './builtin-schemas'
+import type { NamespaceSchema } from './schema'
+import { validateConcept, type CompileWarning } from './validate'
 import type {
   CompileConfigOptions,
   CompileConfigResult,
@@ -49,12 +52,57 @@ export async function compileConfig(
 
   const files = listConfigFiles(instanceDir)
   const parsed = files.map(parseFile)
-  const namespaces = aggregate(parsed)
+  const aggregated = aggregate(parsed)
+
+  // Schema registry : built-in framework schemas + (later) plugin
+  // schemas discovered via plugin manifests. The latter is wired in
+  // a follow-up slice (C5 cont.) once plugin discovery for SCHEMAS
+  // (not just runtime code) is plumbed.
+  const schemasByNamespace: Record<string, NamespaceSchema> = {}
+  for (const s of [...builtinSchemas, ...(options.schemas ?? [])]) {
+    schemasByNamespace[s.namespace] = s
+  }
+
+  // Validate every concept against the schema for its namespace.
+  // Schema-less namespaces : pass-through (warn — proper plugins
+  // SHOULD ship a schema, but we don't break the build for partial
+  // setups during the migration).
+  const validated: Record<string, Record<string, unknown>> = {}
+  const warnings: CompileWarning[] = []
+  for (const [ns, concepts] of Object.entries(aggregated)) {
+    const schema = schemasByNamespace[ns]
+    validated[ns] = {}
+    for (const [concept, value] of Object.entries(concepts)) {
+      if (!schema) {
+        // No schema known for this namespace — pass-through and
+        // emit a one-time note. Plugins should ship a schema ;
+        // until they do, the compile still works on raw YAML.
+        validated[ns]![concept] = value
+        continue
+      }
+      const r = validateConcept(schema, concept, value, sourceOf(parsed, ns, concept))
+      validated[ns]![concept] = r.value
+      warnings.push(...r.warnings)
+    }
+  }
 
   mkdirSync(outDir, { recursive: true })
-  const outputs = emit(namespaces, outDir)
+  const outputs = emit(validated, outDir)
 
-  return { namespaces, outputs }
+  return { namespaces: validated, outputs, warnings }
+}
+
+function sourceOf(
+  parsed: ParsedConfigFile[],
+  ns: string,
+  concept: string,
+): string {
+  for (const f of parsed) {
+    if (f.namespace !== ns) continue
+    if (f.shape === 'concept-named' && f.conceptHint === concept) return f.path
+    if (f.shape === 'self-keyed') return f.path
+  }
+  return `(unknown source for ${ns}.${concept})`
 }
 
 // ─── _internal: file discovery ─────────────────────────────────────────────

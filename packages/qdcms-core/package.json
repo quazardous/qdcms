@@ -32,6 +32,7 @@
     "@quazardous/qdcore": "file:../../../qdadm/packages/qdcore",
     "better-sqlite3": "^12.9.0",
     "semver": "^7.7.4",
+    "valibot": "^1.4.0",
     "yaml": "^2.8.4"
   },
   "devDependencies": {

@@ -12,6 +12,9 @@
  * normalisation.
  */
 
+import type { NamespaceSchema } from './schema'
+import type { CompileWarning } from './validate'
+
 export interface CompileConfigOptions {
   /**
    * Absolute path to the instance config directory (where the
@@ -25,13 +28,21 @@ export interface CompileConfigOptions {
    * `<instanceDir>/.compiled`.
    */
   outDir?: string
+
+  /**
+   * Extra schemas (beyond the framework's built-ins) to register
+   * for validation. Plugin discovery will populate this list
+   * automatically in a follow-up slice ; tests can pass schemas
+   * directly here.
+   */
+  schemas?: NamespaceSchema[]
 }
 
 export interface CompileConfigResult {
   /**
    * Map of namespace ("qdcms" or "plugin-<short>") → concepts
-   * found and their resolved values. Useful for diagnostics and
-   * tests.
+   * found and their resolved values (after schema-default
+   * application). Useful for diagnostics and tests.
    */
   namespaces: Record<string, Record<string, unknown>>
 
@@ -39,6 +50,13 @@ export interface CompileConfigResult {
    * Files written to `outDir`. Includes the `index.ts` aggregator.
    */
   outputs: string[]
+
+  /**
+   * Soft warnings collected during validation (deprecated fields,
+   * locked-field overrides). Hard errors throw ; warnings flow
+   * through here so the caller can log/render them.
+   */
+  warnings: CompileWarning[]
 }
 
 /**
