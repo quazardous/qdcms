@@ -1,0 +1,7 @@
+# status: instance config — edit freely
+# Active locales for the demo. The body IS the `qdcms.locales`
+# concept value (concept-named shape, see docs/config.md §3.2).
+list:
+  - en
+  - fr
+default: en

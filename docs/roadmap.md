@@ -490,6 +490,60 @@ Slices already discussed elsewhere, listed here for visibility:
   no more auto-CRUD ceiling.
 - FK cascade fix in the MikroORM descriptor.
 
+### Axis 9 — Sandbox install pipeline (drush-class CLI / container)
+
+**Goal**: a one-shot reproducible "fresh install" of a qdcms
+instance that exercises the complete pipeline end-to-end — DB
+provisioning, plugin discovery, config compile, migrations, seed
+load, smoke checks. The same primitive serves three audiences :
+
+- **CI** : every PR boots a clean instance and validates the
+  install pipeline before tests run. Catches regressions in
+  schema diff, plugin manifest validation, config compile, etc.
+- **Plugin authors** : `qdcms sandbox --plugin ./my-plugin` spins
+  up a minimal instance with just qdcms-plugin-core and the
+  plugin under test. Run unit tests against a real installed
+  state, not mocks.
+- **New users** : `npx @quazardous/qdcms init my-site` scaffolds
+  a working instance from a template (Drupal `drush
+  site:install` parallel) ; from zero to a booting site in one
+  command.
+
+**Mechanism** :
+- The CLI takes an instance template (or builds one in a temp
+  dir), runs the install steps in order, captures logs and
+  timing per stage, fails loud with a structured report on the
+  first error.
+- A docker variant ships a base image with Node + qdcms-core
+  preinstalled, mounts the instance dir or template, runs the
+  same pipeline. Useful for "does this work outside my dev
+  machine?" checks.
+
+**Why not just integration tests** : integration tests verify
+units of behaviour, but the install pipeline is a sequence of
+operations whose contract crosses many packages (qdcms-core,
+qdcms-backend, qdcms-plugin-*, the config compiler, the
+migration runner). A sandbox primitive treats it as one
+testable surface.
+
+**Deliverables** :
+- `qdcms sandbox` CLI command : runs install, prints stage
+  timings, exits non-zero on any failure.
+- `qdcms init <template>` : scaffolds a fresh instance (templates
+  start with `flowercraft-like`, `minimal`, eventually
+  community-contributed).
+- Docker image : `quazardous/qdcms-sandbox:<version>` for CI use.
+- Integration with the config:compile + migrate pipeline so the
+  sandbox runs the same code path as `npm run build`.
+
+**Drupal parallel** : `drush site:install` provisions a fresh
+site from a profile in one command ; `drush si --uri=test`
+boots into a temp DB for testing. Same mental model.
+
+**Dependency** : sits on top of the config:compile pipeline (this
+doc, slices C4-C9 in `config.md`) — sandbox is meaningful only
+once compile is reproducible.
+
 ### Axis 8 — DRY instances / reusable shell / clean upgrade path — **priority**
 
 **Goal**: a qdcms instance is **thin** — branding, content, plugin

@@ -1,0 +1,18 @@
+# status: instance config — edit freely
+# Plugins shipped with the demo. The in-tab (browser) backend uses
+# this list verbatim to expose /plugins and derive table names. The
+# classic Node backend ignores this and discovers plugins by walking
+# <QDCMS_CORE>/node_modules/ for the `qdcms-plugin` keyword.
+- id: '@quazardous/qdcms-plugin-core'
+  version: '0.1.0'
+  prefix: core
+  title: Core
+  tables:
+    - user
+    - session
+- id: demo
+  version: '0.1.0'
+  prefix: demo
+  title: Demo content
+  tables:
+    - realization

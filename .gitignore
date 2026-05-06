@@ -6,4 +6,5 @@ dist
 coverage
 demo/data/*.sqlite
 demo/data/*.sqlite-journal
+demo/config/.compiled
 .env.local

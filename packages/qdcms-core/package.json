@@ -8,6 +8,7 @@
   "main": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./config": "./src/config/index.ts",
     "./entity": "./src/entity/index.ts",
     "./plugin": "./src/plugin/index.ts",
     "./loader": "./src/loader/index.ts",
