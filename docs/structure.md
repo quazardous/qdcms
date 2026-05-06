@@ -580,6 +580,14 @@ exposes both the one-liner `runQdcmsServer` and the lower-level
 
 ## 6.6 Config-as-code (Drupal-inspired)
 
+> **See [`config.md`](./config.md) for the full spec** — naming
+> convention (`qdcms.*.yaml` / `plugin-<short>.*.yaml`), schema
+> contract (Valibot, locked / overridable / deprecated), compile
+> pipeline (hash + timestamp cache), CMI export/import. The
+> rest of this section gives the spatial overview ; details live
+> in `config.md`.
+
+
 Today the instance carries a single `qdcms.config.ts` file. As
 the framework grows (DC types, page types, menus, roles, themes),
 that file becomes too dense to edit comfortably. Drupal solved
