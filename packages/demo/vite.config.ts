@@ -20,6 +20,15 @@ export default defineConfig({
   resolve: {
     dedupe: ['vue'],
   },
+  // Opt into Sass's modern compiler API (`sass-embedded`) instead of
+  // the legacy JS API. Without this Vite spams a deprecation warning
+  // on every .scss import (qdadm/styles ships .scss). The package is
+  // already a dev dep.
+  css: {
+    preprocessorOptions: {
+      scss: { api: 'modern-compiler' },
+    },
+  },
   server: {
     fs: {
       allow: [resolve(here, '../..'), qdadmRoot],
