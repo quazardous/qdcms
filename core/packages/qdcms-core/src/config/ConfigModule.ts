@@ -22,28 +22,34 @@
  * **Forward direction (not yet shipped)** :
  * - **Sharing** : a `connect(ctx)` that provides the compiled config
  *   bag to other modules at runtime — `ctx.config.get('qdcms.locales')`.
- * - **Visibility levels on each concept** :
- *   - `public` (default) — admin UI exposes it, user-editable,
- *     overridable at runtime.
- *   - `protected` — admin UI hides it, only modules + plugins read
- *     it through ConfigModule. Lives in instance YAML + override
- *     layer like any other config, just not surfaced to humans by
- *     default. The gray-zone home.
- *   - `secret` — never in YAML at all ; sourced from env vars and
- *     mounted into ConfigModule's runtime view alongside the rest.
- *     Modules read uniformly, the source differs.
- *   Composable with the existing field-level `locked: true` (locks
- *   a single field after install regardless of visibility).
+ * - **Visibility + editability are orthogonal.** Two flags per
+ *   concept :
+ *   - `protected` (default `false`) — when true, the concept is
+ *     read-only to humans : the admin UI surfaces it for
+ *     **inspection** (so an operator can debug what a plugin is
+ *     consuming) but offers no editor. The override layer skips
+ *     it. The gray-zone home.
+ *   - `hidden` (default `false`) — when true, the concept is
+ *     omitted from the admin UI entirely. Modules still consume
+ *     it through ConfigModule at runtime ; humans don't see it
+ *     at all.
+ *   `secret` is just convention : a concept marked
+ *   `{ source: 'env', protected: true, hidden: true }` is sourced
+ *   from env vars (never in YAML), invisible in admin, read-only.
+ *   Composes with the existing field-level `locked: true` (locks
+ *   a single field after install — useful on otherwise-public
+ *   concepts to pin identity values).
  * - **Override layer** : an admin-driven runtime tier (slice C9)
  *   backed by a `qdcms_config_live` table, allowing the admin to
- *   tweak any `public` non-locked concept post-install. `protected`
- *   and `secret` concepts bypass this surface entirely.
- * - **Admin UI** : a qdadm-side panel that surfaces every `public`
- *   concept as an editor form, schema-driven (the same `field()`
- *   DSL that validates compile also generates the editor UI).
- *   ConfigModule registers the panel through qdadm's slot system
- *   at connect-time, plus a free-tier "developer" mode that
- *   reveals `protected` concepts for inspection.
+ *   tweak any non-locked, non-protected concept post-install.
+ *   Protected concepts bypass this entirely.
+ * - **Admin UI** : a qdadm-side panel that, for every concept
+ *   the active visibility flags allow, surfaces it as either an
+ *   editor form (public, non-locked) or a read-only inspector
+ *   (`protected`). `hidden` concepts are omitted. Schema-driven :
+ *   the same `field()` DSL that validates compile also generates
+ *   the form / inspector UI. ConfigModule registers the panel
+ *   through qdadm's slot system at connect-time.
  *
  * **Citizenship = 'module'.** Config is framework-essential. An
  * instance can't disable it. A fancier compiler arrives as a separate
