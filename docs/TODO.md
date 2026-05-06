@@ -11,6 +11,28 @@ re-read months later.
 
 ---
 
+## Bugs
+
+- **Admin zone (`/admin`) crashes in production build.** Spotted
+  on `https://demo.nginx.qdcms.localhost:8443/admin` (sandbox
+  nginx topology, vite-built dist). The console shows four
+  `TypeError: Cannot read properties of undefined (reading
+  'meta'/'path'/'fullPath')` — a computed/watcher reads
+  `currentRoute.value.X` before the route resolves. The front
+  zone (`/en`, `/fr` etc.) renders clean ; the issue is
+  qdadm-specific, prod-only (dev mode masks it via Vite's lazier
+  evaluation).
+  Likely culprit : a qdadm setup function or pinia store reads
+  `useRoute()` synchronously in a context where the router
+  isn't yet provided. `bootstrap.ts` already runs
+  `installQdadm(app)` before `app.use(router)` (smell #3 fix),
+  but minified prod evaluation may surface a different timing
+  edge. Investigate with sourcemaps : build the SPA with
+  `vite build --sourcemap`, reproduce in the sandbox, decode
+  the stack to find the offending file:line. Likely fix is
+  either deferring the read with a watch or hardening qdadm
+  against undefined currentRoute.
+
 ## Sandbox
 
 - **Topology profiles in the sandbox.** Add docker-compose
