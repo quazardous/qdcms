@@ -7,6 +7,12 @@ import {
   type SlugTable,
   type StackLevelMetaTemplate,
 } from 'qdcms'
+import { LOCALES, DEFAULT_LOCALE, slugTable } from './config'
+
+// Re-export so existing consumers (FrontShell.vue, install-qdadm.ts)
+// can keep importing from './router'. They'll migrate to './config'
+// directly in a later cleanup pass.
+export { LOCALES, DEFAULT_LOCALE, slugTable }
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -17,66 +23,6 @@ declare module 'vue-router' {
     catchAll?: boolean
   }
 }
-
-export const LOCALES: Locale[] = ['en', 'fr']
-export const DEFAULT_LOCALE: Locale = 'en'
-
-/**
- * Locale-agnostic route table — `name` is the canonical id, `slugs` give the
- * URL segment per locale. The Flower-Craft demo started life in French; the
- * EN slugs were chosen to feel natural in English.
- */
-export const slugTable: SlugTable = [
-  {
-    name: 'home',
-    slugs: { en: '', fr: '' },
-    component: PageRenderer,
-    meta: { stack: [{ type: 'page', name: 'home' }] },
-  },
-  {
-    name: 'realisations',
-    slugs: { en: 'works', fr: 'realisations' },
-    component: PageRenderer,
-    meta: { stack: [{ type: 'collection', name: 'realisations' }] },
-    children: [
-      {
-        name: 'realisation',
-        slugs: { en: ':slug', fr: ':slug' },
-        component: PageRenderer,
-        meta: {
-          stack: [
-            { type: 'collection', name: 'realisations' },
-            { type: 'item', name: 'realisation', idParam: 'slug' },
-          ],
-        },
-      },
-    ],
-  },
-  {
-    name: 'prestations',
-    slugs: { en: 'services', fr: 'prestations' },
-    component: PageRenderer,
-    meta: { stack: [{ type: 'page', name: 'prestations' }] },
-  },
-  {
-    name: 'demarche',
-    slugs: { en: 'approach', fr: 'demarche' },
-    component: PageRenderer,
-    meta: { stack: [{ type: 'page', name: 'demarche' }] },
-  },
-  {
-    name: 'contact',
-    slugs: { en: 'contact', fr: 'contact' },
-    component: PageRenderer,
-    meta: { stack: [{ type: 'page', name: 'contact' }] },
-  },
-  {
-    name: 'me',
-    slugs: { en: 'me', fr: 'me' },
-    component: PageRenderer,
-    meta: { stack: [{ type: 'page', name: 'me' }] },
-  },
-]
 
 const built = buildRoutes(slugTable, {
   locales: LOCALES,

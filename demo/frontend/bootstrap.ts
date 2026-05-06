@@ -16,7 +16,7 @@
  * Symfony-flavoured layering:
  *
  *   main.ts                    → infra entry: bundle scope + backend choice
- *   qdcms.config.ts            → business: plugins + seed (what the app IS)
+ *   config/                    → business: plugins, seed, locales, slug-table (§6.6)
  *   install-demo-backend.ts    → demo-only bridge (in-tab backend)
  *   bootstrap.ts (this file)   → wires CMS + router + Vue, mounts
  *   .env / vite.config         → low-level config

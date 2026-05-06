@@ -19,11 +19,11 @@
 
 import { createBrowserBackend } from '@quazardous/qdcms-backend/browser'
 import { installEmulator } from '@quazardous/qdcms-api-emulator'
-import config from './qdcms.config'
+import { plugins, seed } from './config'
 
 const backend = createBrowserBackend({
-  plugins: config.plugins,
-  seed: config.seed,
+  plugins,
+  seed,
   persist: 'localStorage',
 })
 

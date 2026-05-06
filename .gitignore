@@ -4,3 +4,6 @@ dist
 *.log
 .vite
 coverage
+demo/data/*.sqlite
+demo/data/*.sqlite-journal
+.env.local

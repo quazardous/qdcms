@@ -2,7 +2,7 @@
  * main.ts — infra entry (the technical control panel of the demo).
  *
  * INFRA, not business. This file answers "how does the app boot?".
- * Business config lives in `qdcms.config.ts`; this file just plugs
+ * Business config lives in `config/` (§6.6) ; this file just plugs
  * everything into the runtime and exposes the technical toggles.
  *
  * Two responsibilities, kept ultra-thin on purpose:
