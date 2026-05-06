@@ -79,11 +79,28 @@ A bundled Traefik routes the sandbox over named subdomains so
 tests that care about cookie domains, auth redirect URLs, or
 multi-tenant scenarios get a realistic environment :
 
-| URL                                     | Routes to                |
+| URL                                       | Routes to                  |
 |---|---|
-| `http://demo-frontend.qdcms.localhost`  | qdcms:5180 (Vite dev)    |
-| `http://demo-backend.qdcms.localhost`   | qdcms:5181 (Express API) |
-| `http://traefik.qdcms.localhost`        | Traefik dashboard        |
+| `http://demo-frontend.qdcms.localhost`    | qdcms:5180 (Vite dev)      |
+| `http://demo-backend.qdcms.localhost`     | qdcms:5181 (Express API)   |
+| `http://demo.nginx.qdcms.localhost`       | nginx:80 → SPA dist + API  |
+| `http://traefik.qdcms.localhost`          | Traefik dashboard          |
+
+The `*.nginx.qdcms.localhost` basename rehearses the production
+nginx topology described in [`docs/deploy.md`](../docs/deploy.md)
+§4 — single vhost serving the SPA's static `dist/` and reverse-
+proxying `/api/qdcms/*` to the backend service. Build the
+SPA's dist first :
+
+```sh
+make up           # start qdcms + nginx + traefik
+make build-spa    # vite build → /demo/frontend/dist
+# now http://demo.nginx.qdcms.localhost shows the demo
+```
+
+Without the build, nginx returns 404 (no `dist/index.html` to
+serve). The direct topology (`*.qdcms.localhost`, no `nginx`
+basename) doesn't need the build — Vite serves on the fly.
 
 `*.localhost` auto-resolves to 127.0.0.1 in modern browsers
 (Chrome, Firefox, Safari) — no `/etc/hosts` edit needed. For

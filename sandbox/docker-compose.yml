@@ -13,10 +13,20 @@
 #  - /demo/data       ← bound from sandbox/demo/data
 #  - /demo/.compiled  ← bound from sandbox/demo/.compiled
 #
-# Multi-domain routing via Traefik :
-#  http://demo-frontend.qdcms.localhost   →  qdcms:5180 (Vite dev)
-#  http://demo-backend.qdcms.localhost    →  qdcms:5181 (Express)
-#  http://traefik.qdcms.localhost         →  Traefik dashboard
+# Multi-domain routing via Traefik. Two topologies tested side
+# by side :
+#
+#  Direct (Vite dev / Express) :
+#    demo-frontend.qdcms.localhost  →  qdcms:5180
+#    demo-backend.qdcms.localhost   →  qdcms:5181
+#
+#  nginx (prod-like — serves dist/ + proxies /api → backend) :
+#    demo.nginx.qdcms.localhost     →  nginx:80 → qdcms:5181 (api)
+#                                                + /demo/frontend/dist (static)
+#
+#  Traefik dashboard :
+#    traefik.qdcms.localhost        →  Traefik
+#
 # Plus the legacy direct ports (5180/5181) for non-domain access.
 #
 # Future hook : a config overlay (sandbox-specific YAML
@@ -67,6 +77,33 @@ services:
       - traefik.http.routers.qdcms-sandbox-backend.entrypoints=web
       - traefik.http.routers.qdcms-sandbox-backend.service=qdcms-sandbox-backend
       - traefik.http.services.qdcms-sandbox-backend.loadbalancer.server.port=5181
+
+  # nginx — prod-like topology. Serves the SPA's dist/ statically
+  # and reverse-proxies /api/qdcms/* to the qdcms backend service.
+  # Build the dist first (`make build` in the sandbox) before
+  # this is meaningful ; nginx will 404 on / until then.
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: qdcms-sandbox-nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx/demo.conf:/etc/nginx/conf.d/default.conf:ro
+      # Read-only mount of the instance — nginx serves dist/ and
+      # public/ from here, never writes back.
+      - ../demo:/demo:ro
+    networks:
+      - default
+      - traefik
+    depends_on:
+      - qdcms
+    labels:
+      - traefik.enable=true
+      - dev.project=qdcms-sandbox
+      # Domain pattern : *.nginx.qdcms.localhost — the `.nginx.`
+      # basename makes the topology obvious from the URL.
+      - traefik.http.routers.qdcms-sandbox-nginx.rule=Host(`demo.nginx.qdcms.localhost`)
+      - traefik.http.routers.qdcms-sandbox-nginx.entrypoints=web
+      - traefik.http.services.qdcms-sandbox-nginx.loadbalancer.server.port=80
 
   traefik:
     image: traefik:v3.6

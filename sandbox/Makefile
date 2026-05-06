@@ -88,6 +88,10 @@ typecheck: ## Run typechecks across both worlds
 	$(EXEC) sh -lc 'cd /core && npm run build --workspaces --if-present'
 	$(EXEC) sh -lc 'cd /demo && npm run build --workspaces --if-present'
 
+.PHONY: build-spa
+build-spa: ## Build the demo SPA (vite build) — required for the nginx topology
+	$(EXEC) sh -lc 'cd /demo && npm run build --workspace=demo-frontend'
+
 .PHONY: test
 test: ## Run all workspace tests in /core
 	$(EXEC) sh -lc 'cd /core && npm test --workspaces --if-present'
@@ -129,16 +133,25 @@ plugin-test: ## Run tests for a single plugin. Use: make plugin-test PLUGIN=qdcm
 
 .PHONY: urls
 urls: ## Print the sandbox URLs (Traefik routes + direct ports)
-	@echo "Sandbox URLs (start with 'make up' first) :"
-	@echo "  Traefik routes (HTTP, port $(SANDBOX_HTTP_PORT)) :"
-	@echo "    Frontend  → http://demo-frontend.qdcms.localhost$(if $(filter-out 80,$(SANDBOX_HTTP_PORT)),:$(SANDBOX_HTTP_PORT))"
-	@echo "    Backend   → http://demo-backend.qdcms.localhost$(if $(filter-out 80,$(SANDBOX_HTTP_PORT)),:$(SANDBOX_HTTP_PORT))"
-	@echo "    Dashboard → http://traefik.qdcms.localhost$(if $(filter-out 80,$(SANDBOX_HTTP_PORT)),:$(SANDBOX_HTTP_PORT))"
-	@echo "  Direct ports (no Traefik) :"
-	@echo "    Frontend  → http://localhost:$(SANDBOX_FRONTEND_PORT)"
-	@echo "    Backend   → http://localhost:$(SANDBOX_BACKEND_PORT)"
-	@echo "  Note : *.qdcms.localhost auto-resolves to 127.0.0.1 in"
-	@echo "  modern browsers ; for curl, use --resolve or a host alias."
+	@PORT_SUFFIX="$(if $(filter-out 80,$(SANDBOX_HTTP_PORT)),:$(SANDBOX_HTTP_PORT))"; \
+	echo "Sandbox URLs (start with 'make up' first) :"; \
+	echo ""; \
+	echo "  Direct topology (Vite dev / Express, on Traefik :$(SANDBOX_HTTP_PORT)) :"; \
+	echo "    Frontend  → http://demo-frontend.qdcms.localhost$$PORT_SUFFIX"; \
+	echo "    Backend   → http://demo-backend.qdcms.localhost$$PORT_SUFFIX"; \
+	echo ""; \
+	echo "  nginx topology (prod-like — needs 'make build-spa' first) :"; \
+	echo "    Demo      → http://demo.nginx.qdcms.localhost$$PORT_SUFFIX"; \
+	echo ""; \
+	echo "  Direct ports (no Traefik) :"; \
+	echo "    Frontend  → http://localhost:$(SANDBOX_FRONTEND_PORT)"; \
+	echo "    Backend   → http://localhost:$(SANDBOX_BACKEND_PORT)"; \
+	echo ""; \
+	echo "  Traefik dashboard :"; \
+	echo "    → http://traefik.qdcms.localhost$$PORT_SUFFIX"; \
+	echo ""; \
+	echo "  Note : *.qdcms.localhost auto-resolves to 127.0.0.1 in"; \
+	echo "  modern browsers ; for curl, use --resolve or a host alias."
 
 .PHONY: doctor
 doctor: ## Run the full diagnostic suite (config doctor + tests)
