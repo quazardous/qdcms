@@ -23,6 +23,11 @@ canonical answer to "does this work in a clean env?" — useful for :
 - **Reproducible install pipeline** : `make install` exercises
   the full path (config compile, schema validation, DB
   migrations, seed) against a clean state.
+- **Topology rehearsal** : the same install pipeline that runs
+  on a real host (nginx + systemd + …, see [`docs/deploy.md`](../docs/deploy.md))
+  can run here under different profiles (nginx, apache, mariadb,
+  postgres, tls, multi-site). Catch deploy regressions before
+  they hit production.
 - **Debugging** : `make shell` drops into a shell with the repo
   mounted and qdcms tooling on the PATH.
 

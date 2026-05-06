@@ -11,6 +11,31 @@ re-read months later.
 
 ---
 
+## Sandbox
+
+- **Topology profiles in the sandbox.** Add docker-compose
+  profiles (or sibling compose files) that exercise each
+  production topology documented in [`deploy.md`](./deploy.md).
+  Each profile mirrors a real-host setup so deploy regressions
+  surface in CI, not in production. Concrete list :
+  - `profile-nginx` : nginx vhost in front of qdcms backend +
+    SPA dist. Validates the §4 deploy snippet end-to-end.
+  - `profile-apache` : same for the apache snippet (§5).
+  - `profile-mariadb` : demo against MariaDB instead of SQLite.
+  - `profile-postgres` : demo against Postgres.
+  - `profile-tls` : nginx + mkcert (or self-signed) for HTTPS.
+  - `profile-multi-site` : two instances + two vhosts on one
+    core (deploy.md §10).
+  Each profile lands as its own slice ; the Makefile gains
+  `make profile-<name>` targets that wrap docker compose's
+  `--profile` flag. CI gates the merge on a successful
+  `profile-nginx` run.
+
+- **CI workflow gating on `make doctor` + `profile-nginx`.**
+  GitHub Actions / equivalent. Steps : build the sandbox image,
+  run `make doctor`, run `make profile-nginx`, smoke-test via
+  curl through the nginx vhost. Sub-100 second budget targeted.
+
 ## Frontend
 
 - **`demo/index.html` should be a backend-served template.** The
