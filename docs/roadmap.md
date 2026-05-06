@@ -211,7 +211,7 @@ permissions when composing a role.
   }
   ```
 - Examples (concrete drivers):
-  - **DC plugin** exposes one read/write/delete permission per
+  - **DC module** exposes one read/write/delete permission per
     DC type (`dc.<type>.read|write|delete`) and optionally per
     sensitive field (`dc.<type>.field.<name>.write` — e.g. only
     admin can edit `published_at`).
@@ -256,7 +256,7 @@ never sees a forbidden affordance.
 A plugin's design decision is "where do I enforce?" — not "can I
 enforce?". Examples:
 
-- **DC plugin**: enforces at the API (entity handlers check
+- **DC module**: enforces at the API (entity handlers check
   `dc.<type>.read|write|delete`) AND surfaces field masking in
   qdadm's EntityManager for restricted fields.
 - A **read-only public plugin**: may enforce only in the
@@ -288,28 +288,33 @@ This is the foundation for axes 2 and 3.
 
 ---
 
-### Axis 2 — DC Plugin (hybrid)
+### Axis 2 — DC Module (hybrid)
 
 **Goal**: let a user declare content types and see them materialise
 as main contents + page types.
 
-**Settled**: **hybrid** model — plugin-declared types coexist with
-admin-created ones.
+**Settled**: DC ships as a **first-class module** of qdcms-core
+(citizenship='module', see [`modules.md`](./modules.md)) — not as a
+swappable plugin. Page types compose around main contents that DC
+produces ; without it the framework's content model has no
+backbone. **Hybrid** types : statically-declared by the module
+seed coexist with admin-created ones at runtime.
 
-- New package `@quazardous/qdcms-plugin-dc`.
+- Inside `qdcms-core`, register `DCModule extends Module` with
+  `static moduleName = 'dc'`, `static requires = ['config']`.
 - Entities:
   - `dc_type` — declares a DC type (name, fields schema, URL pattern
     template, default layout),
   - **table per type** (already settled: `dc_<type>` created at
     runtime when a type is created or synced).
 - **Hybrid rules**:
-  - the DC plugin can ship **static** types in its
-    `qdcms-plugin.yaml` (= rows seeded into `dc_type` at boot),
+  - DCModule can ship **static** types in
+    `qdcms-core/config/install/dc.types.yaml` (= rows seeded into
+    `dc_type` at boot),
   - the admin can create / edit **dynamic** types (DB rows),
-  - sync mechanism: at boot, plugin defaults are applied *only*
-    when the row doesn't exist yet — admin edits win over plugin
-    defaults.
-- At boot, the DC plugin:
+  - sync mechanism: at boot, defaults are applied *only* when the
+    row doesn't exist yet — admin edits win.
+- At boot, DCModule:
   - reads active `dc_type` rows,
   - **registers one main content per type** via
     `cms.mainContent(...)` (a generic Vue component renders the
@@ -319,6 +324,10 @@ admin-created ones.
     - `dc.<type>.read | write | delete` per type,
     - per-field permissions for fields flagged `restricted: true`
       (e.g. `dc.story.field.published_at.write`).
+- **Future overrideability** : if an instance wants a swappable DC
+  backend (headless-CMS-backed alternative, etc.), that arrives
+  as a Plugin with `replaces: ['dc']`. DCModule's slot accepts
+  that override the day someone needs it.
 - **Flower Craft demo**: replace the hard-coded `realization`
   entity with a `realization` DC type. Create / edit via admin.
 
@@ -385,7 +394,7 @@ references, not a separate primitive:
 - An entity that needs categorisation declares
   `tags: { type: ref, target: 'dc.term', cardinality: 'many' }`.
 
-The DC plugin ships these two types as **statically declared**
+The DC module ships these two types as **statically declared**
 (yaml) so they exist at boot regardless of admin actions —
 they're load-bearing.
 
@@ -777,7 +786,7 @@ bridge.
 Axis 0    (i18n) ──── transversal ──────→ all axes
 Axis 0bis (Auth) ──── transversal ──────→ all axes
 
-Axis 1 (Page Type) ──┬─→ Axis 2 (DC Plugin)
+Axis 1 (Page Type) ──┬─→ Axis 2 (DC Module)
                      │     └─→ field types + refs + taxonomy
                      ├─→ Axis 3 (Admin UI: page-builder, dc-manager,
                      │              menu-builder, role-builder)
@@ -915,7 +924,7 @@ explicitly skipping.
   cardinality, inverse, FK cascade.
 
 - **Taxonomy** — *in roadmap* (Axis 2, built-in pattern):
-  vocabulary + term DC types ship with the DC plugin as
+  vocabulary + term DC types ship with the DC module as
   statically-declared types. Built on top of references.
 
 - **Files / Media** — no plan for image upload / management /
@@ -1006,7 +1015,7 @@ PHP-class CMSs :
 
 | Concern                  | Roadmap status              | Likely shape             |
 |---|---|---|
-| Content types + fields   | Axis 2 (DC plugin)          | Core                     |
+| Content types + fields   | Axis 2 (DC module)          | Core                     |
 | Field types catalogue    | Implicit in Axis 2          | Detail of Axis 2         |
 | Entity references        | Not yet                     | Detail of Axis 2         |
 | Menus                    | Not yet                     | Could fold in Axis 3     |

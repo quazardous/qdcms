@@ -27,8 +27,14 @@
  */
 
 import { Module } from '../module/Module'
+import type {
+  BackendContext,
+  FrontendContext,
+  HttpRouter,
+} from '../module/types'
 import { validatePlugin } from '../plugin/schema'
 import type { Plugin } from '../plugin/types'
+import type { NamespaceSchema } from '../config/schema'
 import {
   KernelChainConflictError,
   KernelCycleError,
@@ -205,6 +211,164 @@ export class Kernel {
     return order
   }
 
+  // ─── Compile-time aggregation ────────────────────────────────
+
+  /**
+   * Aggregate every Module + Plugin's `configSchemas` across the
+   * whole topology. Used by the compile pipeline (CLI's
+   * `qdcms config:compile`) to walk the schema registry without
+   * caring about citizenship or chain layering.
+   *
+   * Each instance contributes its schemas exactly once, even when it
+   * sits in multiple slots (consolidator plugin in `replaces` =
+   * many slots, same instance).
+   *
+   * Reads either the instance's `readonly configSchemas` (Plugin
+   * pattern) or the constructor's `static configSchemas` (Module
+   * pattern), preferring instance over static when both exist.
+   */
+  collectConfigSchemas(): readonly NamespaceSchema[] {
+    const out: NamespaceSchema[] = []
+    const seen = new Set<Module | Plugin>()
+    for (const slot of this.slots.values()) {
+      for (const entry of slot.chain) {
+        if (seen.has(entry.instance)) continue
+        seen.add(entry.instance)
+        const schemas = readArrayContribution<NamespaceSchema>(
+          entry.instance,
+          'configSchemas',
+        )
+        out.push(...schemas)
+      }
+    }
+    return out
+  }
+
+  // ─── Lifecycle dispatch ──────────────────────────────────────
+
+  /**
+   * Backend install : iterate slots in topological order, walk each
+   * chain bottom-to-top, call `install(ctx)` on every entry. Wrappers
+   * see their predecessors' state because predecessors run first.
+   *
+   * Each instance runs `install` at most once even if it appears in
+   * multiple slots' chains (consolidator pattern).
+   */
+  async installAll(ctx: BackendContext): Promise<void> {
+    const order = this.topoSort()
+    const installed = new Set<Module | Plugin>()
+    for (const slotName of order) {
+      const slot = this.slots.get(slotName)!
+      for (const entry of slot.chain) {
+        if (installed.has(entry.instance)) continue
+        installed.add(entry.instance)
+        const inst = entry.instance as { install?: (c: BackendContext) => Promise<void> }
+        if (typeof inst.install === 'function') {
+          await inst.install(ctx)
+        }
+      }
+    }
+  }
+
+  /**
+   * Backend uninstall : mirror of `installAll`. Slots in reverse topo,
+   * each chain top-to-bottom. Wrappers tear down before their
+   * predecessors.
+   */
+  async uninstallAll(ctx: BackendContext): Promise<void> {
+    const order = this.topoSort().slice().reverse()
+    const uninstalled = new Set<Module | Plugin>()
+    for (const slotName of order) {
+      const slot = this.slots.get(slotName)!
+      for (let i = slot.chain.length - 1; i >= 0; i--) {
+        const entry = slot.chain[i]!
+        if (uninstalled.has(entry.instance)) continue
+        uninstalled.add(entry.instance)
+        const inst = entry.instance as {
+          uninstall?: (c: BackendContext) => Promise<void>
+        }
+        if (typeof inst.uninstall === 'function') {
+          await inst.uninstall(ctx)
+        }
+      }
+    }
+  }
+
+  /**
+   * Backend HTTP routes : the **active** instance of each slot
+   * registers routes. Predecessors stay silent — they're reachable
+   * to wrappers via `replaced(slot, caller)` but they don't own
+   * routes once superseded.
+   */
+  registerAllHttpRoutes(router: HttpRouter, ctx: BackendContext): void {
+    const order = this.topoSort()
+    const seen = new Set<Module | Plugin>()
+    for (const slotName of order) {
+      const active = this.get(slotName)
+      if (!active || seen.has(active)) continue
+      seen.add(active)
+      const inst = active as {
+        registerHttpRoutes?: (r: HttpRouter, c: BackendContext) => void
+      }
+      if (typeof inst.registerHttpRoutes === 'function') {
+        inst.registerHttpRoutes(router, ctx)
+      }
+    }
+  }
+
+  /**
+   * Frontend connect : active instance only, in topo order. Modules
+   * + plugins that own a slot's role wire their UI / signal listeners
+   * here.
+   */
+  async connectAll(ctx: FrontendContext): Promise<void> {
+    const order = this.topoSort()
+    const seen = new Set<Module | Plugin>()
+    for (const slotName of order) {
+      const active = this.get(slotName)
+      if (!active || seen.has(active)) continue
+      seen.add(active)
+      const inst = active as { connect?: (c: FrontendContext) => Promise<void> }
+      if (typeof inst.connect === 'function') {
+        await inst.connect(ctx)
+      }
+    }
+  }
+
+  /** Mirror of `connectAll`. Active only, reverse topo. */
+  async disconnectAll(): Promise<void> {
+    const order = this.topoSort().slice().reverse()
+    const seen = new Set<Module | Plugin>()
+    for (const slotName of order) {
+      const active = this.get(slotName)
+      if (!active || seen.has(active)) continue
+      seen.add(active)
+      const inst = active as { disconnect?: () => Promise<void> }
+      if (typeof inst.disconnect === 'function') {
+        await inst.disconnect()
+      }
+    }
+  }
+
+  /**
+   * Pre-connect frontend hook : load every active instance's styles.
+   * Runs before `connectAll` so the CSS is applied by the time
+   * `connect` mounts components.
+   */
+  async loadStylesAll(): Promise<void> {
+    const order = this.topoSort()
+    const seen = new Set<Module | Plugin>()
+    for (const slotName of order) {
+      const active = this.get(slotName)
+      if (!active || seen.has(active)) continue
+      seen.add(active)
+      const inst = active as { loadStyles?: () => Promise<void> }
+      if (typeof inst.loadStyles === 'function') {
+        await inst.loadStyles()
+      }
+    }
+  }
+
   // ─── Internals ───────────────────────────────────────────────
 
   private appendChainEntry(slotName: string, entry: ChainEntry): void {
@@ -237,11 +401,26 @@ export class Kernel {
     const slot = this.slots.get(slotName)
     if (!slot || slot.chain.length === 0) return []
     const active = slot.chain[slot.chain.length - 1]!.instance
-    // Plugin (instance readonly).
-    const fromInstance = (active as { requires?: readonly string[] }).requires
-    if (Array.isArray(fromInstance)) return fromInstance
-    // Module (constructor static).
-    const ctor = active.constructor as { requires?: readonly string[] }
-    return ctor.requires ?? []
+    return readArrayContribution<string>(active, 'requires')
   }
+}
+
+// ─── Module-level helpers ───────────────────────────────────────────────────
+
+/**
+ * Read an array-typed contribution field from a Module/Plugin instance.
+ * Plugins declare it as `readonly` instance property ; Modules use a
+ * constructor static. Instance wins when both exist.
+ */
+function readArrayContribution<T>(
+  instance: Module | Plugin,
+  key: string,
+): readonly T[] {
+  const fromInstance = (instance as unknown as Record<string, unknown>)[key]
+  if (Array.isArray(fromInstance)) return fromInstance as T[]
+  const fromCtor = (instance.constructor as unknown as Record<string, unknown>)[
+    key
+  ]
+  if (Array.isArray(fromCtor)) return fromCtor as T[]
+  return []
 }

@@ -164,12 +164,12 @@ public contract :
 ```ts
 export interface Plugin {
   // Identity — npm-unique, stable.
-  readonly id: string                          // '@quazardous/qdcms-plugin-dc'
+  readonly id: string                          // '@quazardous/qdcms-plugin-auth-oauth'
   readonly version: string                     // semver
-  readonly prefix: string                      // 'dc' (table + config-file prefix)
+  readonly prefix: string                      // 'auth_oauth' (table + config-file prefix)
 
   // Role identity — what this plugin "is" to dependants.
-  readonly name: string                        // typically same as prefix or derived from it
+  readonly name: string                        // 'auth-oauth' — slot key in the kernel
 
   // Topology in the kernel registry.
   readonly requires?: readonly string[]        // names this plugin needs
@@ -213,26 +213,27 @@ The interface :
 A plugin implementation typically looks like :
 
 ```ts
-// packages/qdcms-plugin-dc/src/DCPlugin.ts
-class DCPlugin extends Module implements Plugin {
-  readonly id = '@quazardous/qdcms-plugin-dc'
-  readonly name = 'dc'
-  readonly prefix = 'dc'
+// packages/qdcms-plugin-auth-oauth/src/OAuthPlugin.ts
+class OAuthPlugin extends Module implements Plugin {
+  readonly id = '@quazardous/qdcms-plugin-auth-oauth'
+  readonly name = 'auth-oauth'
+  readonly prefix = 'auth_oauth'
   readonly version = '0.1.0'
 
   readonly requires = ['config'] as const
-  readonly replaces = []
+  readonly replaces = ['auth'] as const
+  readonly weight = 10
 
-  readonly configSchemas = [dcTypesSchema, dcFieldsSchema]
-  readonly entities = [dcTypeEntity, /* dynamic per-type tables */]
-  readonly migrations = [dcInitialMigration]
+  readonly configSchemas = [oauthProvidersSchema]
+  readonly entities = [oauthSessionEntity, oauthProviderEntity]
+  readonly migrations = [oauthInitialMigration]
 
-  async install(ctx) { /* seed default DC types */ }
-  async uninstall(ctx) { /* drop dc_* tables */ }
+  async install(ctx) { /* run migrations + register providers */ }
+  async uninstall(ctx) { /* drop oauth tables */ }
 
   registerHttpRoutes(router) {
-    router.get('/api/qdcms/dc/types', this.listTypes)
-    // …
+    router.get('/api/qdcms/auth/login/oauth/:provider', this.startHandler)
+    router.get('/api/qdcms/auth/callback/oauth/:provider', this.callbackHandler)
   }
 }
 ```
@@ -391,7 +392,8 @@ Two distinct intents :
 
 - **Compose** (additive) : a plugin adds a new role to the
   kernel — `replaces` is empty, everyone keeps their slot.
-  Example : DCPlugin adds the `dc` role.
+  Example : a `qdcms-plugin-search-meilisearch` adds a fresh
+  `meilisearch` role consumed by other plugins via `requires`.
 - **Replace** (chain) : a plugin layers on an existing slot —
   it appears in the slot's chain at its declared `weight`. The
   existing occupant is not destroyed ; it just stops being the
@@ -567,23 +569,20 @@ foundation. If a fancier compiler arrives, it'd be a separate
 plugin (`qdcms-plugin-config-compile-rust`) that replaces only
 the compile-time bits.
 
-### 6.2 DCPlugin (public — citizenship 'plugin')
+### 6.2 DCModule (internal — citizenship 'module')
 
 ```ts
-class DCPlugin extends Module implements Plugin {
-  readonly id = '@quazardous/qdcms-plugin-dc'
-  readonly name = 'dc'
-  readonly prefix = 'dc'
-  readonly version = '0.1.0'
+class DCModule extends Module {
+  static moduleName = 'dc'
+  static requires = ['config']
 
-  readonly requires = ['config'] as const
-  readonly configSchemas = [dcTypesSchema, dcFieldsSchema]
-  readonly entities = [dcTypeEntity]
-  readonly migrations = [dcInitialMigration]
+  static configSchemas = [dcTypesSchema, dcFieldsSchema]
+  static entities = [dcTypeEntity]
+  static migrations = [dcInitialMigration]
 
   async install(ctx) {
     // Apply migrations + seed default types from
-    // <plugin>/config/install/plugin-dc.types.yaml
+    // qdcms-core/config/install/dc.types.yaml
   }
 
   registerHttpRoutes(router) {
@@ -594,8 +593,16 @@ class DCPlugin extends Module implements Plugin {
 }
 ```
 
-Discovered via the qdcms-plugin keyword on the package, validated
-at boot. Adds a new role (`dc`) to the kernel — no override.
+DC is a **first-class qdcms concept**, not an opt-in plugin. Page
+types compose around main contents that DC produces ; without it
+the framework's content model has nothing to display. So it ships
+inside qdcms-core with `citizenship='module'`, version-locked to
+the framework, no Plugin-interface validation needed.
+
+If a future requirement asks for a swappable DC backend (e.g. a
+headless-CMS-backed alternative), that arrives as a Plugin with
+`replaces: ['dc']` — DC gets promoted to a slot that accepts
+override at that point.
 
 ### 6.3 ElasticSearchPlugin (consolidates multiple roles)
 
@@ -716,9 +723,9 @@ qdcms/
                                             config/qdcms.plugins.yaml
 ```
 
-A plugin package (e.g. `@quazardous/qdcms-plugin-dc`) lives in
-its own git repo + npm package — never inside qdcms-core.
-Modules ship inside qdcms-core packages.
+A plugin package (e.g. `@quazardous/qdcms-plugin-auth-oauth`)
+lives in its own git repo + npm package — never inside
+qdcms-core. Modules ship inside qdcms-core packages.
 
 ---
 
@@ -816,12 +823,17 @@ The CLI's `qdcms config:compile` invokes
 `Kernel.boot({ phase: 'compile' })` internally. The Kernel
 walks every module's `configSchemas` and runs the compiler.
 
-**Slice M7 — DC as the first published Plugin**
-Build `@quazardous/qdcms-plugin-dc` (Axis 2) using the full
-Plugin contract. Validates the design end-to-end.
+**Slice M7 — DCModule as the first kernel-driven module**
+Build `DCModule extends Module` inside qdcms-core (Axis 2 of the
+roadmap) and let the Kernel orchestrate its install / connect.
+DC stays at citizenship='module' — it's a first-class qdcms
+concept, not a swappable plugin. Validates the kernel-driven
+lifecycle end-to-end with a real consumer.
 
 After M7, the Module/Plugin system is real and the framework
-has a clear extension contract.
+has a clear extension contract. The first **published Plugin**
+(citizenship='plugin') ships when an instance asks for a
+swappable role — likely auth alternatives or search backends.
 
 ---
 
@@ -833,7 +845,8 @@ has a clear extension contract.
   contribute schemas, plugins ship install templates).
 - [`cli.md`](./cli.md) — qdcms CLI design, oclif plugin
   extensibility (foundation for plugin command discovery).
-- [`roadmap.md`](./roadmap.md) — Axis 2 (DC), Axis 0bis (Auth),
-  Axis 6 (Menus) — first concrete plugins.
+- [`roadmap.md`](./roadmap.md) — Axis 2 (DC, citizenship 'module'),
+  Axis 0bis (Auth, plugin-friendly slot), Axis 6 (Menus) — the
+  first concrete consumers of this contract.
 - qdadm's `Module` class — `qdadm/packages/qdadm/src/kernel/Module.ts`,
   the base we extend.
