@@ -104,9 +104,16 @@ qdcms/
 │   ├── plugins.md                     ← plugin model contract
 │   ├── roadmap.md                     ← living roadmap
 │   ├── structure.md                   ← this file
+│   ├── config.md                      ← config-as-code spec
+│   ├── cli.md                         ← qdcms CLI design (oclif-based)
 │   ├── instance-anatomy.md            ← how an instance is shaped
 │   └── qdadm-vue-dedup.md             ← cross-repo dev note
 ├── scripts/                           ← repo-level dev tooling
+├── sandbox/                           ← reproducible Docker env (drush-class)
+│   ├── README.md
+│   ├── Makefile                       ← `make help` lists every target
+│   ├── docker-compose.yml
+│   └── Dockerfile
 │
 ├── packages/                          ← LIBRARIES (publishable)
 │   │

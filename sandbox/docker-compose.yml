@@ -1,0 +1,42 @@
+# sandbox/docker-compose.yml — qdcms reproducible env.
+#
+# One service today (qdcms) ; future services (db, mailcatcher…)
+# slot in alongside without touching the Makefile API.
+
+services:
+  qdcms:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: qdcms-sandbox:dev
+    container_name: qdcms-sandbox
+    # Mount the repo at /workspace so edits flow both ways.
+    volumes:
+      - ../:/workspace
+      # Keep node_modules inside the container ; if the host has
+      # a different OS / arch, native modules (better-sqlite3)
+      # would break otherwise. Per-package node_modules are
+      # captured by named volumes.
+      - qdcms-node-modules-root:/workspace/node_modules
+      - qdcms-node-modules-frontend:/workspace/demo/frontend/node_modules
+      - qdcms-node-modules-backend:/workspace/demo/backend/node_modules
+    working_dir: /workspace
+    # Frontend dev port (Vite) + backend dev port (Express).
+    # Override via SANDBOX_FRONTEND_PORT / SANDBOX_BACKEND_PORT
+    # in the Makefile if these clash with your host.
+    ports:
+      - '${SANDBOX_FRONTEND_PORT:-5180}:5180'
+      - '${SANDBOX_BACKEND_PORT:-5181}:5181'
+    environment:
+      - NODE_ENV=development
+      # Force the qdcms host root to /workspace so the plugin
+      # walker doesn't get confused by the volume layering.
+      - QDCMS_CORE=/workspace
+    # `tail -f /dev/null` keeps the container alive ; the
+    # Makefile uses `docker compose exec` for everything actual.
+    command: ['tail', '-f', '/dev/null']
+
+volumes:
+  qdcms-node-modules-root:
+  qdcms-node-modules-frontend:
+  qdcms-node-modules-backend:
