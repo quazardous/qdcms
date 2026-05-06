@@ -109,7 +109,7 @@ qdcms/
 │   ├── instance-anatomy.md            ← how an instance is shaped
 │   └── qdadm-vue-dedup.md             ← cross-repo dev note
 ├── scripts/                           ← repo-level dev tooling
-├── sandbox/                           ← reproducible Docker env (drush-class)
+├── sandbox/                           ← reproducible Docker env
 │   ├── README.md
 │   ├── Makefile                       ← `make help` lists every target
 │   ├── docker-compose.yml
@@ -585,26 +585,26 @@ exposes both the one-liner `runQdcmsServer` and the lower-level
 
 ---
 
-## 6.6 Config-as-code (Drupal-inspired)
+## 6.6 Config-as-code
 
 > **See [`config.md`](./config.md) for the full spec** — naming
 > convention (`qdcms.*.yaml` / `plugin-<short>.*.yaml`), schema
 > contract (Valibot, locked / overridable / deprecated), compile
-> pipeline (hash + timestamp cache), CMI export/import. The
-> rest of this section gives the spatial overview ; details live
-> in `config.md`.
+> pipeline (hash + timestamp cache), live admin export/import.
+> The rest of this section gives the spatial overview ; details
+> live in `config.md`.
 
 
 Today the instance carries a single `qdcms.config.ts` file. As
 the framework grows (DC types, page types, menus, roles, themes),
-that file becomes too dense to edit comfortably. Drupal solved
-this with `config/sync/*.yml` — one file per concept,
-version-controlled, exportable/importable between environments.
+that file becomes too dense to edit comfortably. The fix : split
+into one YAML file per concept, version-controlled, exportable
+and importable between environments.
 
-qdcms adopts the same pattern, with one twist : **the YAML is
-compiled into a typed TS artifact at build time**. Authors edit
-human-friendly YAML; the runtime reads a fast, validated JSON
-artifact with TypeScript types.
+qdcms adds one twist : **the YAML is compiled into a typed TS
+artifact at build time**. Authors edit human-friendly YAML ; the
+runtime reads a fast, validated JSON artifact with TypeScript
+types.
 
 ### Layout
 
@@ -630,7 +630,7 @@ mon-site/
 ### Two layers : YAML (static) + `qdcms.config.ts` (dynamic tweaks)
 
 - **YAML files in `config/`** — the **static, declarative** truth.
-  Drupal-style. Most of the site's configuration lives here.
+  Most of the site's configuration lives here.
   Compiled into `config/.compiled/` and loaded automatically by
   the shell — **the user never imports it**. That's internal
   plumbing.
@@ -752,27 +752,21 @@ authoring of YAML, the runtime speed of TS/JSON, and validation
 catches errors at compile time (with file/line pointers) rather
 than as cryptic runtime failures.
 
-### Drupal alignment
+### Layered storage
 
-This pattern is what Drupal does, end-to-end :
-
-| Drupal                                 | qdcms                              |
+| Layer                                  | Storage                                       |
 |---|---|
-| `config/sync/*.yml` (committed)        | `config/*.yaml` (committed)         |
-| `drush config:export` / `:import`      | `qdcms config:export` / `:import` (admin → YAML, future) |
-| live config storage (database table)   | runtime config object loaded from `.compiled/` |
-| `drush config:status` (drift detector) | `qdcms doctor` checks YAML vs admin DB rows |
+| Committed source of truth              | `<instance>/config/*.yaml`                    |
+| Compiled artefact (runtime input)      | `<instance>/config/.compiled/*.ts`            |
+| Live admin-edited overrides            | DB rows (`qdcms_config_live`)                 |
+| Plugin install templates               | `<plugin>/config/install/*.yaml`              |
 
-The DC plugin's hybrid pattern (statically declared in plugin
-yaml + admin-modifiable rows) maps cleanly :
-- plugin's `qdcms-plugin.yaml` ships static types,
-- instance's `config/dc-types.yaml` adds / overrides,
-- admin edits write back to instance YAML when "export" is run,
-- the "live" runtime state is the merge.
-
-This is a future axis on its own (Drupal calls it CMI —
-Configuration Management Initiative) ; mentioned here so the
-file layout above already anticipates it.
+Operator surface (the qdcms CLI, see `cli.md`) :
+`qdcms config:compile`, `:export`, `:import`, `:status`,
+`:doctor`. The DC plugin's hybrid pattern (plugin-shipped types
++ admin-editable rows) materialises through the same layered
+storage : plugin install seeds the YAML, admin edits the DB,
+`config:export` writes the merged state back.
 
 ---
 
@@ -903,24 +897,20 @@ opening it. Any *file* at the instance root that isn't on this
 list is a **smell** — a shell-level concern that leaked into the
 instance and needs extracting back to the core.
 
-#### Drupal-aligned naming
+#### `core` vs `custom` naming
 
-Drupal's `core/` (vendored framework code) vs `custom/`
-(site-specific code) is a universally legible signal. qdcms borrows
-the vocabulary, but applies it at the **right boundary** :
+Two unambiguous English words split vendored framework from
+site-specific code :
 
 - The qdcms repo (= the world `QDCMS_CORE` points at) is the
-  **`core`** in Drupal's sense — vendored framework, hands-off,
-  upgraded as a unit.
-- **`plugins/custom/`** inside the instance — bespoke plugins for
-  this site only. Sibling Drupal idiom : `web/modules/custom/`.
-  The implicit `plugins/contrib/` is `node_modules/<plugin>` and
-  needs no folder of its own — npm handles it.
+  **`core`** — vendored framework, hands-off, upgraded as a
+  unit.
+- **`plugins/custom/`** inside the instance — bespoke plugins
+  for this site only. The implicit `plugins/contrib/` is
+  `node_modules/<plugin>` and needs no folder of its own — npm
+  handles it.
 - **`themes/custom/`** inside the instance — bespoke themes for
   this site only.
-
-A reader who knows Drupal reads our layout instantly. A reader
-who doesn't gets unambiguous English words.
 
 ### 7.D Mapping today's `demo/src/` to the target layout
 

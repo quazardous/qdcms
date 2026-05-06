@@ -1,0 +1,3 @@
+{
+  "extends": "@quazardous/qdcms-backend-server/tsconfig.preset.json"
+}

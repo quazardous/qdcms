@@ -31,8 +31,8 @@ Two rules :
 
 1. **The instance OWNS its config.** `<instance>/config/*.yaml`
    is the source of truth ; the runtime never reads from a plugin
-   package at boot time. This matches Drupal's CMI : config in the
-   site (committed, exportable), not scattered across modules.
+   package at boot time. Config lives in the site (committed,
+   exportable), not scattered across plugin packages.
 2. **Plugins CONTRIBUTE.** Each plugin ships its own defaults and
    schemas under `<plugin>/config/`. These are read by the
    compile pipeline at build time, never by the runtime.
@@ -649,8 +649,7 @@ Two flows :
 
 `qdcms config:export` dumps the current DB live state back into
 `<instance>/config/<prefix>.<concept>.yaml`, replacing the
-human-readable file. Author commits the diff. Drupal calls this
-`drush config:export` ; same idea.
+human-readable file. Author commits the diff.
 
 `qdcms config:status` prints which concepts have live rows
 diverging from the YAML — useful before exporting.
@@ -660,21 +659,22 @@ to the DB. Useful for staging-to-prod deploys.
 
 ---
 
-## 9. Drupal CMI alignment
+## 9. Layered config storage
 
-| Drupal                                 | qdcms                              |
+The config layer separates four concerns deliberately :
+
+| Concern                                | Where it lives                                       |
 |---|---|
-| `web/modules/<module>/config/install/*.yml` | `packages/<plugin>/config/install/*.yaml` |
-| `web/modules/<module>/config/schema/*.yml`  | `packages/<plugin>/config/schemas/*.ts`   |
-| `<site>/config/sync/*.yml`             | `<instance>/config/*.yaml`         |
-| Live config storage (`config` table)   | `qdcms_config_live` rows           |
-| `drush config:export`                  | `qdcms config:export`              |
-| `drush config:import`                  | `qdcms config:import`              |
-| `drush config:status`                  | `qdcms config:status`              |
-| `drupal_required_module_X`             | `qdcms-plugin-X` keyword in npm    |
+| Plugin install templates (default rows) | `packages/<plugin>/config/install/*.yaml`           |
+| Plugin schemas (validation + types)    | `packages/<plugin>/config/schemas/*.ts`              |
+| Instance source of truth (committed)   | `<instance>/config/*.yaml`                          |
+| Live admin-edited state                | `qdcms_config_live` rows in the DB                  |
+| Compile-time merge of all of the above | `<instance>/config/.compiled/*.ts`                  |
 
-The mental model is intentionally identical. A Drupal site-builder
-should feel at home reading a qdcms config layout.
+Operator surface (the qdcms CLI, see `cli.md`) :
+`qdcms config:compile`, `:export`, `:import`, `:status`,
+`:doctor`, `:upgrade`. Plugin lifecycle :
+`qdcms plugin:enable`, `:disable`, `:list`.
 
 ---
 
@@ -756,8 +756,8 @@ back to the YAML — Axis 2 unblocked.
   (bigger, more popular) and pure JSON-Schema + Ajv (no TS
   inference, but standardized). Decide before C5.
 - **Schema format** : `.ts` colocated with plugin source proposed.
-  Alternative : `.yaml` schemas (more declarative, drupal-aligned)
-  with a runtime adapter. `.ts` wins on IDE support ; revisit if
+  Alternative : `.yaml` schemas (more declarative) with a runtime
+  adapter. `.ts` wins on IDE support ; revisit if
   authoring-by-non-devs becomes a goal.
 - **Cache invalidation on schema-version bump** : currently
   proposes hashing the schema TS file content. Sufficient unless
@@ -782,5 +782,4 @@ back to the YAML — Axis 2 unblocked.
   instance layout.
 - [`roadmap.md`](./roadmap.md) Axis 0 (i18n), Axis 1 (page types),
   Axis 2 (DC), Axis 3 (admin UI) — all consume this contract.
-- Drupal CMI documentation — the mental model we're aligning on.
 - [Valibot](https://valibot.dev) — the proposed schema lib.

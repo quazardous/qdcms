@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "compile-config": "tsx ../scripts/compile-config.ts",
+    "compile-config": "qdcms config:compile ../config",
     "dev": "npm run compile-config && vite --port 5180",
     "build": "npm run compile-config && vite build",
     "preview": "vite preview --port 5180"
@@ -25,6 +25,7 @@
     "vue-router": "^4.4.0"
   },
   "devDependencies": {
+    "@quazardous/qdcms-cli": "*",
     "@vitejs/plugin-vue": "^5.2.0",
     "sass-embedded": "^1.99.0",
     "tsx": "^4.19.0",

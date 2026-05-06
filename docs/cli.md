@@ -6,8 +6,8 @@
 
 The qdcms CLI is the operator's primary surface for everything
 NOT runtime — config compile, install, migrate, sandbox, doctor,
-plugin lifecycle, admin export/import. Drush is the reference :
-one tool, dense in capability, plugin-extensible.
+plugin lifecycle, admin export/import. One tool, dense in
+capability, plugin-extensible.
 
 This doc captures the framework choice, the command surface,
 and the extensibility contract.
@@ -16,7 +16,7 @@ and the extensibility contract.
 
 ## 1. Framework choice : oclif
 
-Three serious candidates for a drush-class CLI :
+Three serious candidates for a plugin-extensible CLI :
 
 | Framework  | Plugin system           | Maturity  | Bundle weight | Typing     |
 |---|---|---|---|---|
@@ -32,8 +32,8 @@ Why :
   CLI commands (`qdcms dc:type:create`, `qdcms dc:list`) by
   declaring `oclif.plugins` in its `package.json`. The user
   installs the plugin, the commands appear. No glue code in the
-  instance. This is the killer feature for a drush-class CLI ;
-  citty/commander would require us to reinvent it.
+  instance. This is the killer feature for a plugin-extensible
+  CLI ; citty/commander would require us to reinvent it.
 - **Topic / command structure.** `qdcms config:compile`,
   `qdcms install`, `qdcms cache:clear` map to oclif's
   topic:command convention out of the box.
@@ -84,8 +84,7 @@ packages/qdcms-cli/
 
 ## 3. Command surface (initial)
 
-Drush-aligned naming where the parallel is direct, qdcms-native
-where it isn't.
+Topic:command naming throughout, oclif-native.
 
 ### 3.1 Config
 
@@ -137,12 +136,9 @@ The CLI delegates to the Makefile + docker-compose at
 
 ## 4. Plugin extensibility
 
-Drush's plugin system : a Drupal module can ship `*.drush.inc`
-files and the `drush` binary picks them up. qdcms's parallel :
-oclif plugins.
-
-A qdcms plugin package can declare CLI commands in its
-`package.json` :
+A qdcms plugin package can ship CLI commands and have them
+appear under the same `qdcms` binary. The plugin declares its
+commands in `package.json` :
 
 ```json
 {
@@ -170,7 +166,7 @@ The qdcms-cli package, on startup, walks
 
 ## 5. UX conventions
 
-- **Topic separator** : `:` (oclif default, also drush). So
+- **Topic separator** : `:` (oclif default). So
   `qdcms config:compile` not `qdcms config compile` and not
   `qdcms-config-compile`.
 - **`--help`** on every command, auto-generated.
@@ -237,18 +233,16 @@ instance.
   qdcms-keyword'd packages — works, but means every plugin
   install changes the CLI's command set without a
   package.json edit. Decide whether that auto-magic is welcome
-  (yes — drush works that way) or surprising (no — explicit is
-  better).
+  (yes — npm-installed plugins should "just work") or surprising
+  (no — explicit is better).
 - **CLI alias** : `qdcms` everywhere, or also a short `qd` ?
-  Drush has `drush` only. Sticking with `qdcms` (no shortcut).
+  Sticking with `qdcms` (no shortcut).
 
 ---
 
 ## 8. References
 
 - [oclif documentation](https://oclif.io)
-- Drush command reference — the gold standard for CMS-class
-  CLIs.
 - [`config.md`](./config.md) — the contract this CLI executes.
 - [`roadmap.md`](./roadmap.md) Axis 9 — the sandbox that's the
   first non-trivial consumer of this CLI.

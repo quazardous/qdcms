@@ -1,7 +1,9 @@
 # sandbox/ — qdcms reproducible environment
 
-A Docker-based sandbox that runs qdcms in an isolated, reproducible
-environment. Multi-purpose, driven by a Makefile.
+A Docker-based sandbox that runs qdcms in an isolated,
+reproducible environment. Multi-purpose, driven by a Makefile.
+Plays the role of "clean room" for install-pipeline testing,
+plugin author harnesses, demo runs, and debugging.
 
 ## Why
 
@@ -20,8 +22,7 @@ canonical answer to "does this work in a clean env?" — useful for :
   Docker.
 - **Reproducible install pipeline** : `make install` exercises
   the full path (config compile, schema validation, DB
-  migrations, seed) against a clean state, the same way the
-  drush sandbox does for Drupal.
+  migrations, seed) against a clean state.
 - **Debugging** : `make shell` drops into a shell with the repo
   mounted and qdcms tooling on the PATH.
 

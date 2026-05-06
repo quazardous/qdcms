@@ -1,0 +1,53 @@
+{
+  "name": "@quazardous/qdcms-cli",
+  "version": "0.1.0",
+  "description": "qdcms CLI — extensible operator surface (config:compile, install, plugin:enable, sandbox:start). Built on oclif.",
+  "author": "quazardous",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "bin": {
+    "qdcms": "./bin/qdcms.js"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "oclif": {
+    "bin": "qdcms",
+    "dirname": "qdcms",
+    "commands": "./src/commands",
+    "topicSeparator": ":",
+    "topics": {
+      "config": {
+        "description": "Compile, validate, export, and import instance config (config-as-code, see docs/config.md)."
+      },
+      "plugin": {
+        "description": "Plugin lifecycle: enable, disable, list."
+      },
+      "sandbox": {
+        "description": "Drive the qdcms sandbox container (see sandbox/README.md)."
+      }
+    }
+  },
+  "dependencies": {
+    "@oclif/core": "^4.0.0",
+    "@quazardous/qdcms-core": "*",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "keywords": [
+    "qdcms",
+    "qdcms-cli",
+    "cli",
+    "oclif"
+  ]
+}

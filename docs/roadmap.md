@@ -441,7 +441,7 @@ Stacked levels:
 **Goal**: site navigation as data, not as hardcoded blocks.
 
 Today the demo's `SiteNav` block hardcodes its links. Real sites
-need admin-editable menus. Drupal-style menu trees, but
+need admin-editable menus. Tree-shaped, but
 i18n-aware from day one.
 
 - Entity `qdcms_menu` — top-level menu (`id`, `name`,
@@ -490,7 +490,7 @@ Slices already discussed elsewhere, listed here for visibility:
   no more auto-CRUD ceiling.
 - FK cascade fix in the MikroORM descriptor.
 
-### Axis 9 — Sandbox install pipeline (drush-class CLI / container)
+### Axis 9 — Sandbox install pipeline (extensible CLI / container)
 
 **Goal**: a one-shot reproducible "fresh install" of a qdcms
 instance that exercises the complete pipeline end-to-end — DB
@@ -505,9 +505,8 @@ load, smoke checks. The same primitive serves three audiences :
   plugin under test. Run unit tests against a real installed
   state, not mocks.
 - **New users** : `npx @quazardous/qdcms init my-site` scaffolds
-  a working instance from a template (Drupal `drush
-  site:install` parallel) ; from zero to a booting site in one
-  command.
+  a working instance from a template ; from zero to a booting
+  site in one command.
 
 **Mechanism** :
 - The CLI takes an instance template (or builds one in a temp
@@ -535,10 +534,6 @@ testable surface.
 - Docker image : `quazardous/qdcms-sandbox:<version>` for CI use.
 - Integration with the config:compile + migrate pipeline so the
   sandbox runs the same code path as `npm run build`.
-
-**Drupal parallel** : `drush site:install` provisions a fresh
-site from a profile in one command ; `drush si --uri=test`
-boots into a temp DB for testing. Same mental model.
 
 **Dependency** : sits on top of the config:compile pipeline (this
 doc, slices C4-C9 in `config.md`) — sandbox is meaningful only
@@ -896,13 +891,13 @@ To be settled while tackling the corresponding axis.
 
 ---
 
-## 7. Gap analysis vs a Drupal-class CMS
+## 7. Maturity gaps (CMS-class capabilities)
 
-Drupal is the reference for "what a mature CMS does". This section
-maps what's covered by the roadmap above versus what's still
-missing, ranked by impact. Not every gap is worth filling — some
-are out of qdcms's scope by design — but it's healthy to know
-what we're explicitly skipping.
+A mature CMS does many things qdcms doesn't yet. This section
+lists the gaps explicitly, ranked by impact, so we don't pretend
+they're not gaps. Not every gap is worth filling — some are out
+of qdcms's scope by design — but it's healthy to know what we're
+explicitly skipping.
 
 ### Critical gaps (block core usability)
 
@@ -930,7 +925,7 @@ what we're explicitly skipping.
   derivatives. Probably its own plugin, doesn't need to live in
   core.
 
-- **Revisions / history** — Drupal versions every node mutation
+- **Revisions / history** — version every content mutation
   (who, when, what). Roadmap is silent. For a content-driven
   site this is table stakes (rollback bad edits, audit trail).
   Could be a generic mechanism on top of any DC type — opt-in
@@ -938,34 +933,32 @@ what we're explicitly skipping.
 
 ### Important gaps (operational)
 
-- **Configuration management** — Drupal's CMI exports config as
-  YAML to move it between dev / staging / prod. With Axes 1-3
-  landing, qdcms's "config" lives in DB rows (page types, DC
-  types, role × permission, active locales, theme overrides).
-  Needs an export/import mechanism — typically a `qdcms config:export`
-  CLI dumping these tables to YAML and the inverse for import.
-  Pre-requisite: Axes 1-3 landed first.
+- **Configuration management** — *partially in roadmap* (see
+  `config.md` slices C8-C9): admin write-back to instance YAML
+  via `qdcms config:export` / `:import` / `:status` so live DB
+  state can be moved between dev / staging / prod. Pre-requisite:
+  the live config DB layer (after C5).
 
-- **Path aliases & redirects** — Drupal has admin-editable URL
-  aliases (`/node/123` → `/about-us`) and redirect rows
+- **Path aliases & redirects** — admin-editable URL aliases
+  (e.g. `/node/123` → `/about-us`) and redirect rows
   (301 / 302). Our slug-per-locale per page type covers the
   pattern case but not row-level overrides. Needs `qdcms_alias`
   + `qdcms_redirect` entities and a router middleware.
 
-- **Editorial workflow / moderation** — Drupal Workflow module:
-  draft → in review → published, per-entity. Roadmap is silent.
-  Probably opt-in per DC type (a state field + transition rules).
+- **Editorial workflow / moderation** — draft → in review →
+  published, per-entity. Roadmap is silent. Probably opt-in per
+  DC type (a state field + transition rules).
 
-- **Search** — Drupal Search API + Solr / ElasticSearch
-  integration. Roadmap is silent. At minimum a SQL full-text
-  search on DC types, ideally pluggable (search adapter) for
-  external engines.
+- **Search** — full-text search across DC types. Roadmap is
+  silent. At minimum a SQL FTS index on DC types, ideally
+  pluggable (search adapter) for external engines (Solr,
+  ElasticSearch, Meilisearch, …).
 
-- **Cache tags** — Drupal invalidates rendered output by tag
-  (`node:42`, `taxonomy_term:7`). qdcms has signals + composable
-  cache hints (qcms-frontend's cache invalidation), but no
-  formalised tag-based render-cache. Useful when SSR / output
-  caching arrives.
+- **Cache tags** — invalidate rendered output by tag (`dc:post:42`,
+  `dc:taxonomy_term:7`). qdcms has signals + composable cache
+  hints (qcms-frontend's cache invalidation), but no formalised
+  tag-based render-cache. Useful when SSR / output caching
+  arrives.
 
 ### Nice-to-have (often plugin-shaped)
 
@@ -974,67 +967,63 @@ what we're explicitly skipping.
   = an instance). Doesn't need first-class framework support if
   DC + entity references land.
 
-- **Views (query builder)** — Drupal's killer feature: an admin
-  GUI to compose any list (filters, sorts, exposed filters,
-  pagination, displays as block / page / feed). Ours: lists are
-  programmatic for now. A true Views equivalent is a major
-  product on its own — could be a future plugin
-  `qdcms-plugin-views`.
+- **Visual query builder** — an admin GUI to compose any list
+  (filters, sorts, exposed filters, pagination, displays as
+  block / page / feed). Ours: lists are programmatic for now.
+  A true visual builder is a major product on its own — could
+  be a future plugin `qdcms-plugin-views`.
 
 - **Comments / Webforms / SEO toolkit (sitemap, meta tags,
   hreflang)** — each is a candidate plugin. Out of core but
   worth documenting as expected ecosystem pieces.
 
-- **Multisite (one install, many sites)** — Drupal-specific
-  pattern. Out of scope for qdcms — the npm + qdcms-backend
-  model favours one app per site.
+- **Multisite (one install, many sites)** — out of scope. The
+  npm + qdcms-backend model favours one app per site ; mounting
+  N sites under one process adds complexity for limited gain.
 
-### Where qdcms diverges by design (not gaps)
+### Native traits (not gaps)
 
-These aren't missing — they're explicit choices to do things
-differently from Drupal:
+These are explicit qdcms choices that may differ from older
+PHP-class CMSs :
 
-- **TypeScript-first, npm-pure plugins** — Drupal modules ship
-  as zip archives + composer packages. Ours are plain npm
-  packages with `qdcms-plugin.yaml`, discovered through
-  `node_modules`. Simpler dependency graph, real TS types.
+- **TypeScript-first, npm-pure plugins** — plain npm packages
+  with `qdcms-plugin.yaml`, discovered through `node_modules`.
+  Simpler dependency graph, real TS types throughout.
 
-- **Vue 3 SPA front, not server-rendered HTML** — Drupal renders
-  on the server by default. qdcms is a client SPA talking HTTP
-  to qdcms-backend. SSR / SSG can be added later but isn't the
-  default.
+- **Vue 3 SPA front by default** — qdcms is a client SPA talking
+  HTTP to qdcms-backend. SSR / SSG can be added later but isn't
+  the default.
 
-- **Backend can run in the browser** — qdcms-backend/browser is
-  a unique trait — useful for static-site demos and offline-first
-  scenarios. Drupal can't do this.
+- **Backend can run in the browser** — `qdcms-backend/browser`
+  is a unique trait — useful for static-site demos and
+  offline-first scenarios.
 
 - **Shared SignalBus across zones** — qcms ↔ qdadm reactivity
-  is built-in. Drupal modules communicate via hooks (one-shot)
-  and the cache tag system; it doesn't have a live event bus
-  spanning frontend + admin in a single SPA.
+  is built-in. A live event bus spans frontend + admin in a
+  single SPA, beyond one-shot hooks.
 
 ### Summary table
 
-| Concern                  | Drupal | Roadmap status              | Likely shape       |
-|---|---|---|---|
-| Content types + fields   | ✅     | Axis 2 (DC plugin)          | Core               |
-| Field types catalogue    | ✅     | Implicit in Axis 2          | Detail of Axis 2   |
-| Entity references        | ✅     | Not yet                     | Detail of Axis 2   |
-| Menus                    | ✅     | Not yet                     | Could fold in Axis 3 |
-| Files / Media            | ✅     | Not yet                     | Plugin             |
-| Revisions / history      | ✅     | Not yet                     | Opt-in on DC type  |
-| Workflow / moderation    | ✅     | Not yet                     | Opt-in on DC type  |
-| Search                   | ✅     | Not yet                     | Plugin + adapters  |
-| Cache tags               | ✅     | Partial (signals)           | Render-cache layer |
-| Path aliases / redirects | ✅     | Not yet                     | Core entity + middleware |
-| Configuration management | ✅     | Not yet                     | CLI tooling        |
-| Taxonomy                 | ✅     | Solved via DC + refs        | Plugin             |
-| Views (query builder)    | ✅     | Not yet                     | Plugin             |
-| Comments / Forms / SEO   | ✅     | Not yet                     | Plugins            |
-| Multisite                | ✅     | Out of scope                | —                  |
-| Backend-in-browser       | ❌     | Shipped                     | Native             |
-| Shared event bus         | ❌     | Shipped (SignalBus)         | Native             |
-| TypeScript types         | ❌     | Native                      | Native             |
+| Concern                  | Roadmap status              | Likely shape             |
+|---|---|---|
+| Content types + fields   | Axis 2 (DC plugin)          | Core                     |
+| Field types catalogue    | Implicit in Axis 2          | Detail of Axis 2         |
+| Entity references        | Not yet                     | Detail of Axis 2         |
+| Menus                    | Not yet                     | Could fold in Axis 3     |
+| Files / Media            | Not yet                     | Plugin                   |
+| Revisions / history      | Not yet                     | Opt-in on DC type        |
+| Workflow / moderation    | Not yet                     | Opt-in on DC type        |
+| Search                   | Not yet                     | Plugin + adapters        |
+| Cache tags               | Partial (signals)           | Render-cache layer       |
+| Path aliases / redirects | Not yet                     | Core entity + middleware |
+| Configuration management | Partial (config.md C8-C9)   | CLI tooling              |
+| Taxonomy                 | Solved via DC + refs        | Plugin                   |
+| Visual query builder     | Not yet                     | Plugin                   |
+| Comments / Forms / SEO   | Not yet                     | Plugins                  |
+| Multisite                | Out of scope                | —                        |
+| Backend-in-browser       | Shipped                     | Native                   |
+| Shared event bus         | Shipped (SignalBus)         | Native                   |
+| TypeScript types         | Native                      | Native                   |
 
 ---
 

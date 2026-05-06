@@ -70,7 +70,7 @@ install-deps: ## Run `npm install` against the mounted repo
 
 .PHONY: compile-config
 compile-config: ## Compile demo/config/*.yaml into .compiled/
-	$(EXEC) npm run compile-config --workspace=demo-frontend
+	$(EXEC) npx qdcms config:compile demo/config
 
 .PHONY: typecheck
 typecheck: ## Run vue-tsc + tsc across all workspaces
@@ -81,9 +81,9 @@ test: ## Run all workspace tests
 	$(EXEC) npm test --workspaces --if-present
 
 .PHONY: install
-install: ## Full install pipeline : deps + compile-config + typecheck + test
+install: ## Full install pipeline : deps + qdcms install + typecheck + test
 	$(MAKE) install-deps
-	$(MAKE) compile-config
+	$(EXEC) npx qdcms install --instance demo/config
 	$(MAKE) typecheck
 	$(MAKE) test
 
@@ -118,6 +118,6 @@ doctor: ## Run the full diagnostic suite (compile + tests, structured output)
 	$(EXEC) bash -lc 'set -e; \
 	  echo "[doctor] Node: $$(node --version)"; \
 	  echo "[doctor] npm: $$(npm --version)"; \
-	  echo "[doctor] compile-config:"; npm run compile-config --workspace=demo-frontend 2>&1 | sed "s/^/  /"; \
+	  echo "[doctor] qdcms install:"; npx qdcms install --instance demo/config 2>&1 | sed "s/^/  /"; \
 	  echo "[doctor] tests:"; npm test --workspaces --if-present 2>&1 | tail -5 | sed "s/^/  /"; \
 	  echo "[doctor] OK"'
