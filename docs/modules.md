@@ -152,6 +152,9 @@ export interface Plugin {
   // Topology in the kernel registry.
   readonly requires?: readonly string[]        // names this plugin needs
   readonly replaces?: readonly string[]        // names this plugin overrides
+  readonly weight?: number                     // chain order when multiple
+                                               // plugins replace the same slot ;
+                                               // higher = outer (active). default 0.
 
   // Contributions — strict shape, validated at install.
   readonly configSchemas: readonly NamespaceSchema[]
@@ -218,8 +221,10 @@ class DCPlugin extends Module implements Plugin {
 
 A plugin can take the slot of any other already-registered name
 (module OR plugin) by declaring `replaces: ['<name>']`. The
-Kernel unregisters the previous occupant and registers the
-plugin under that name.
+Kernel layers the plugin **on top** of the previous occupant —
+both instances stay alive ; the new one becomes the **active**
+slot occupant, the previous one becomes accessible to it via a
+helper (see §4.4).
 
 `replaces` accepts multiple names — a single plugin can
 **consolidate several roles** :
@@ -235,30 +240,60 @@ class ElasticSearchPlugin extends Module implements Plugin {
 }
 ```
 
-After registration, the Kernel's registry has the plugin under
-**all** the relevant names :
+After registration, the Kernel's registry exposes the plugin as
+the **active** instance under all the relevant names :
 
 ```
 kernel['elastic']  = ElasticSearchPlugin   // its own slot
-kernel['search']   = ElasticSearchPlugin   // via replaces
-kernel['indexer']  = ElasticSearchPlugin   // via replaces
-kernel['fulltext'] = ElasticSearchPlugin   // via replaces
+kernel['search']   = ElasticSearchPlugin   // active in slot 'search'
+kernel['indexer']  = ElasticSearchPlugin   // active in slot 'indexer'
+kernel['fulltext'] = ElasticSearchPlugin   // active in slot 'fulltext'
 ```
 
 Modules that depend on `requires: ['search']` continue to
-resolve correctly — they get the plugin instance. The
+resolve correctly — they get the active instance. The
 consolidation is transparent.
 
-### Conflict detection
+### 4.1 Chain semantics and `weight`
 
-- Two plugins claiming the same `replaces` slot → fatal at boot
-  (`"plugins '@x/foo' and '@y/bar' both replace 'auth'"`).
+Multiple plugins **can** replace the same slot. The Kernel
+orders them by `weight` (ascending) and builds a chain :
+
+```
+slot 'auth'
+  ├─ PasswordAuthModule       (citizenship='module', weight=0,  base)
+  ├─ AuthMFAPlugin            (replaces=['auth'],    weight=10)  ← wraps password
+  └─ AuditLogAuthPlugin       (replaces=['auth'],    weight=20)  ← active, wraps MFA
+       ▲
+       └─ kernel.get('auth') returns this one — outermost wins.
+```
+
+The **active** instance for a slot is the highest-weight entry
+in its chain. That instance is what dispatches user-facing
+hooks (HTTP routes, frontend `connect`). Predecessors stay
+alive in the chain and are reachable via the kernel helper —
+they don't register routes themselves once superseded.
+
+`weight` defaults to `0`. The base (un-replaced) entry behaves
+as the bottom of the chain. Plugins that wrap a role pick a
+weight high enough to land above the base ; if several wrappers
+co-exist, they pick weights to express their layering intent.
+
+### 4.2 Conflict detection
+
+- Two plugins replacing the same slot with **the same weight**
+  → fatal at boot (`"plugins '@x/foo' and '@y/bar' both replace
+  'auth' with weight=10 — disambiguate via weight"`).
 - A plugin that `replaces: ['inexistent']` → warning, plugin
-  runs additively under its own name.
+  runs additively under its own name (no chain to attach to).
 - A plugin's `requires` not satisfied after replace resolution
   → fatal.
+- A `replaces` cycle (A replaces B, B replaces A) → fatal at
+  boot. Cycles can't form via `replaces` alone (each plugin's
+  replaces list is static), but combined with weight ties they'd
+  produce ambiguous chains — caught by the same-weight check.
 
-### Schema inheritance on replace
+### 4.3 Schema inheritance on replace
 
 Override moves the **runtime slot** but **keeps the replaced
 party's `configSchemas`** registered in the compile-time
@@ -266,93 +301,105 @@ registry. The rationale : a plugin that replaces `auth` is
 declaring "I take over the role" — and that role comes with the
 existing config surface (e.g. `auth.cookies-options`,
 `auth.session-ttl` files the user has already written and the
-admin has filled). The replacing plugin reads them via the
+admin has filled). The active plugin reads them via the
 shared config registry.
 
-### Decorator pattern (wrapping the replaced impl)
+In a multi-replace chain, schemas accumulate from the bottom up :
+each layer keeps its predecessors' schemas registered (minus
+anything explicitly dropped via `dropsConfigSchemas`).
 
-If a replacing plugin wants to keep the original implementation
-alive internally (decorator / MFA-on-top-of-password pattern),
-**use npm to do it** — no kernel-level magic. Add the
-replaced plugin as a regular npm dependency, import its class,
-instantiate it for the wrapper's private use :
+### 4.4 Accessing the replaced instance (kernel helper)
 
-```ts
-// AuthMFAPlugin's package.json
-{
-  "name": "@quazardous/qdcms-plugin-auth-mfa",
-  "dependencies": {
-    "@quazardous/qdcms-plugin-auth-cookies": "^1.0.0"
-  }
-}
-```
+When a plugin wants to **wrap** the predecessor it replaces —
+typical decorator / MFA-on-password pattern — it does NOT
+instantiate the predecessor itself. The Kernel already holds an
+instance of every entry in the chain ; the plugin just asks for
+it via the install/runtime context :
 
 ```ts
-// AuthMFAPlugin source
-import { CookiesAuthPlugin } from '@quazardous/qdcms-plugin-auth-cookies'
-
 class AuthMFAPlugin extends Module implements Plugin {
   readonly id = '@quazardous/qdcms-plugin-auth-mfa'
   readonly name = 'auth-mfa'
   readonly replaces = ['auth'] as const
-
-  private inner = new CookiesAuthPlugin()        // private decorator target
+  readonly weight = 10                       // sits above the base auth
 
   async install(ctx) {
-    await this.inner.install(ctx)                // delegate base setup
-    await this.addMfaSecretColumn(ctx)           // add MFA-specific bits
+    // ctx.replaced(slotName) returns the immediately-below
+    // instance in the chain (the predecessor this plugin
+    // wraps), or undefined if there is none.
+    const inner = ctx.replaced('auth')
+    await inner?.install?.(ctx)              // delegate base setup
+    await this.addMfaSecretColumn(ctx)
   }
 
   registerHttpRoutes(router, ctx) {
     router.post('/api/qdcms/auth/login', async (req, res) => {
-      const user = await this.inner.verifyCredentials(req.body)
+      const inner = ctx.replaced('auth')     // same helper at runtime
+      const user  = await inner.verifyCredentials(req.body)
       // …add MFA challenge on top
     })
   }
 }
 ```
 
-The Kernel stays simple — it manages **slots**, not decoration
-relationships. Decoration is a plugin-author concern, expressed
-through standard npm dependency syntax. The wrapping plugin
-takes the slot via `replaces` ; the wrapped impl is invisible
-to other dependants but freely usable by the wrapper.
+Helper API on `ctx` :
 
-```ts
-class OAuthPlugin extends Module implements Plugin {
-  readonly replaces = ['auth'] as const
-  readonly configSchemas = [oauthSchema]   // adds its own
+| Helper                          | Returns                                          |
+|---|---|
+| `ctx.replaced(slot)`            | Immediately-below instance in the slot's chain (or `undefined`) |
+| `ctx.replacedChain(slot)`       | Full chain, bottom-to-top, EXCLUDING the caller  |
+| `ctx.kernel.get(slot)`          | Active (top-of-chain) instance for the slot      |
 
-  async install(ctx) {
-    // Read the replaced plugin's config the same way as if it
-    // were our own — no special API.
-    const cookieOpts = ctx.config.get('auth.cookies-options')
-    const ttl        = ctx.config.get('auth.session-ttl')
-    const oauthCfg   = ctx.config.get('auth-oauth.providers')
+The wrapping plugin remains agnostic about who its predecessor
+actually is — could be the framework's default
+`PasswordAuthModule`, could be another plugin
+(`@x/qdcms-plugin-auth-cookies`), could be a chain of two. As
+long as the predecessor honours the role's contract, wrapping
+works.
 
-    // …use them.
-  }
-}
-```
+**No npm dependency on the wrapped package.** The wrapper does
+not `import { CookiesAuthPlugin } from '...'` — it talks to its
+predecessor purely through the shared role contract (the
+methods declared by the slot's interface). That keeps the
+wrapper portable across implementations.
 
-The replacing plugin can :
+### 4.5 Compose vs replace
+
+Two distinct intents :
+
+- **Compose** (additive) : a plugin adds a new role to the
+  kernel — `replaces` is empty, everyone keeps their slot.
+  Example : DCPlugin adds the `dc` role.
+- **Replace** (chain) : a plugin layers on an existing slot —
+  it appears in the slot's chain at its declared `weight`. The
+  existing occupant is not destroyed ; it just stops being the
+  active one for that slot.
+
+The Kernel always preserves the chain. There's no
+"unregister-then-register" — `replaces` is a layering operator,
+never a destruction operator.
+
+### 4.6 Drop / extend at the role level
+
+The active plugin can :
 
 - **Inherit silently** : do nothing, the replaced schemas stay
-  registered, instance YAML files still validate, plugin reads
-  them as needed.
+  registered, instance YAML files still validate, the plugin
+  reads them via `ctx.config.get('auth.…')` as needed.
 - **Extend** : declare its own `configSchemas` (additional
   files / concepts the user can author).
 - **Drop** : declare `dropsConfigSchemas: ['auth.legacy-thing']`
-  to mark a schema as unused. The compile pipeline emits a
-  deprecation warning if the user still has YAML for it ; after
-  one major bump, the schema is unregistered and the YAML is
-  rejected.
+  to mark a schema as unused by the chain's active impl. The
+  compile pipeline emits a deprecation warning if the user
+  still has YAML for it ; after one major bump, the schema is
+  unregistered and the YAML is rejected.
 
 ```ts
 class OAuthPlugin extends Module implements Plugin {
   readonly replaces = ['auth'] as const
+  readonly weight = 10
   readonly configSchemas = [oauthSchema]
-  readonly dropsConfigSchemas = ['auth.password-policy'] as const   // not used by OAuth
+  readonly dropsConfigSchemas = ['auth.password-policy'] as const   // OAuth doesn't honour this
 }
 ```
 
@@ -361,7 +408,7 @@ the user's existing config keeps working under the new
 implementation, with explicit opt-out for the parts the new
 impl doesn't honour.
 
-### Module override : allowed but unusual
+### 4.7 Module override : allowed but unusual
 
 Replacing a slot whose current occupant has citizenship
 `'module'` is **allowed** but **unusual**. Modules are typically
@@ -395,11 +442,17 @@ in a comment.
 ## 5. The Kernel
 
 ```ts
-interface Slot {
-  readonly name: string
+interface ChainEntry {
   readonly instance: Module
   readonly citizenship: 'module' | 'plugin'
   readonly origin: string                    // 'qdcms-core' or '@x/qdcms-plugin-Y'
+  readonly weight: number
+}
+
+interface Slot {
+  readonly name: string
+  readonly chain: readonly ChainEntry[]      // bottom-to-top, sorted by weight
+  readonly active: ChainEntry                // == chain.at(-1)
 }
 
 class Kernel {
@@ -407,11 +460,14 @@ class Kernel {
   // in topo-sorted order).
   registerModule(m: Module): void
   registerPlugin(p: Plugin): void
-  unregister(name: string): void
 
   // Access.
-  get(name: string): Slot | undefined
+  get(name: string): Module | undefined         // active instance for the slot
+  slot(name: string): Slot | undefined          // full chain
   list(): readonly Slot[]
+  replaced(name: string, caller: Module): Module | undefined
+                                                // immediate predecessor of caller
+                                                // in the slot's chain
 
   // Boot — applies the full pipeline (validate, topo, register).
   boot(input: KernelInput): Promise<void>
@@ -421,18 +477,31 @@ class Kernel {
 `boot()` runs the orchestration described in §4 :
 
 ```
-1. Register internal modules (citizenship = 'module')
+1. Register internal modules (citizenship = 'module', weight=0)
 2. Resolve enabled plugins from qdcms.plugins.yaml + discovery
 3. Validate plugin contracts (Valibot)
-4. Detect override conflicts (multiple replaces on same slot)
-5. Topo-sort plugins by `requires` (post-replace registry)
-6. Apply : for each plugin in topo order, unregister(replaces),
-   then registerPlugin
-7. Run lifecycle hooks (install, connect) per phase
+4. Detect chain conflicts (same slot + same weight from two
+   different plugins)
+5. Topo-sort plugins by `requires` (using each slot's active
+   instance to satisfy `requires`)
+6. Apply : for each plugin in topo order, append to the chain
+   of every slot in its `replaces` list (sorted-insert by weight)
+7. Run lifecycle hooks per phase :
+     - install : bottom-to-top across each chain (every entry,
+       so wrappers run AFTER their predecessor's setup)
+     - registerHttpRoutes / connect : active (top of chain) only
+     - uninstall : top-to-bottom (mirror order)
 ```
+
+The Kernel maintains the chain invariant : `slot.active === slot.chain.at(-1)`.
+Predecessors stay alive and addressable via the `replaced`
+helper. They do not register routes/hooks themselves once
+superseded — the active instance owns the slot's external
+surface and chooses whether/how to delegate to predecessors.
 
 Cycles in `requires` → fatal with the cycle path printed.
 Unsatisfied `requires` → fatal with the missing slot name.
+Same-weight collision in a chain → fatal (see §4.2).
 
 ---
 
@@ -533,7 +602,7 @@ Modules that `requires: ['search']` continue to resolve correctly
 post-override. The instance gets a more performant impl in one
 opt-in.
 
-### 6.4 OAuthPlugin (drop-in auth replacement)
+### 6.4 OAuthPlugin (drop-in auth replacement, no wrap)
 
 ```ts
 class OAuthPlugin extends Module implements Plugin {
@@ -544,8 +613,10 @@ class OAuthPlugin extends Module implements Plugin {
 
   readonly requires = ['config'] as const
   readonly replaces = ['auth'] as const
+  readonly weight = 10                     // sits above the base auth
 
-  // Same role contract as the default auth module.
+  // Doesn't delegate to the predecessor — full re-impl of the
+  // role. Routes installed here own /api/qdcms/auth/* outright.
   readonly entities = [oauthSessionEntity, oauthProviderEntity]
   readonly migrations = [oauthInitialMigration]
 
@@ -557,7 +628,45 @@ class OAuthPlugin extends Module implements Plugin {
 ```
 
 `requires: ['auth']` consumers (DC, admin UI) work transparently
-with this plugin in place.
+with this plugin active for the slot.
+
+### 6.5 AuthMFAPlugin (wrapping plugin, uses the helper)
+
+```ts
+class AuthMFAPlugin extends Module implements Plugin {
+  readonly id = '@quazardous/qdcms-plugin-auth-mfa'
+  readonly name = 'auth-mfa'
+  readonly prefix = 'auth-mfa'
+  readonly version = '0.1.0'
+
+  readonly requires = ['config'] as const
+  readonly replaces = ['auth'] as const
+  readonly weight = 20                     // above any base / OAuth replacer
+
+  readonly configSchemas = [mfaSchema]
+  readonly entities = [mfaSecretEntity]
+
+  async install(ctx) {
+    // Don't reach for the predecessor's class via npm — ask
+    // the kernel for whoever sits below us in the chain.
+    await ctx.replaced('auth')?.install?.(ctx)
+    await this.runMigrations(ctx)
+  }
+
+  registerHttpRoutes(router, ctx) {
+    router.post('/api/qdcms/auth/login', async (req, res) => {
+      const inner = ctx.replaced('auth')!         // chain guarantees it
+      const user  = await inner.verifyCredentials(req.body)
+      if (this.requiresMfa(user)) return this.challenge(res, user)
+      return this.completeLogin(res, user)
+    })
+  }
+}
+```
+
+Notice the wrapper has **zero npm dependency** on the wrapped
+plugin — it talks to its predecessor through the role contract,
+whoever happens to be in that chain entry.
 
 ---
 
@@ -668,10 +777,12 @@ Wrap the existing `compileConfig`, `validateConcept`,
 `builtinSchemas` into a `ConfigModule extends Module`. Public
 API of qdcms-core/config stays compatible (re-exports).
 
-**Slice M4 — Kernel with topo + override**
+**Slice M4 — Kernel with topo + chain**
 `qdcms-core/src/kernel/Kernel.ts` : registerModule,
-registerPlugin, unregister, get, boot. Topo sort on requires.
-Override-with-replaces. Conflict detection. ~400 lines + tests.
+registerPlugin, get, slot, replaced, boot. Topo sort on
+requires. Chain-of-replacers ordered by weight, with the
+`ctx.replaced(slot)` helper. Same-weight conflict detection.
+~500 lines + tests.
 
 **Slice M5 — Plugin loader**
 Generalize the current qdcms-cli plugin discovery to load full
