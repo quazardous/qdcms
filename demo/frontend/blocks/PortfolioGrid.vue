@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { LocaleLink } from 'qdcms'
 import { useDemoCollection } from '../services'
-import type { Realization } from '../data/realizations'
+import type { Realization } from '../content/realizations'
 
 const props = defineProps<{ limit?: number; heading?: string; lead?: string }>()
 

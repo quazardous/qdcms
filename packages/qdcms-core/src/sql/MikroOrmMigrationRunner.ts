@@ -215,10 +215,16 @@ export class MikroOrmMigrationRunner {
       )
     }
 
-    // The MikroOrmSchemaMigrator left the storage reconnected with the
-    // desired entity set — system table is part of the storage's
-    // baseline so it survived. Re-init it just to be safe (cheap).
-    await this.store.init()
+    // NOTE: do NOT re-call store.init() here. Two cases :
+    //   • file SQLite : the disconnect/reconnect dance preserves the
+    //     file, so qdcms_schema_state created at line 134 survives ;
+    //     the diff sees it and won't emit CREATE for it.
+    //   • :memory:    : disconnect wiped the DB, so the diff DOES
+    //     emit CREATE qdcms_schema_state — executing it below
+    //     recreates the table.
+    // Calling `store.init()` here would conflict with the diff's
+    // CREATE on the :memory: path (the diff doesn't use
+    // IF NOT EXISTS).
 
     // Apply DDL statements. Each one runs through the storage's
     // execute() — implementation-agnostic.

@@ -12,7 +12,7 @@
 import { onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { LangSwitcher, bindRouter, declaredStackBuilder, useCms, withLocale } from 'qdcms'
-import { LOCALES, buildUrl } from '../router'
+import { LOCALES, buildUrl } from './router'
 
 const router = useRouter()
 const cms = useCms()

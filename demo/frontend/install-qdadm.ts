@@ -31,11 +31,11 @@ import { AppLayout } from 'qdadm/components'
 import 'qdadm/styles'
 import 'primeicons/primeicons.css'
 
-import { signals } from '../shell/signals'
-import { debugBridge } from '../shell/debugBridge'
-import { router } from '../router'
+import { signals } from './signals'
+import { debugBridge } from './debugBridge'
+import { router } from './router'
 import AdminHome from './pages/AdminHome.vue'
-import { version as demoVersion } from '../../package.json'
+import { version as demoVersion } from './package.json'
 
 export function installQdadm(app: App): Kernel {
   const options: KernelOptions = {
@@ -64,10 +64,15 @@ export function installQdadm(app: App): Kernel {
     // to register its collectors onto the host's shared bridge instead
     // of creating its own — the demo renders ONE unified <DebugBar />
     // covering both qdcms and qdadm panels.
+    //
+    // Cast: qdadm's `DebugBarConfig.module` is typed as
+    // `new (options: unknown) => unknown` which is contravariantly
+    // incompatible with concrete module classes (DebugModule expects
+    // DebugModuleOptions). Runtime is fine; type-only mismatch.
     debugBar: {
       ...debugBar,
       bridge: debugBridge,
-    },
+    } as KernelOptions['debugBar'],
     notifications: { enabled: true, maxNotifications: 100 },
 
     features: {

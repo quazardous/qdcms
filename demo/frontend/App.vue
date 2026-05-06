@@ -15,9 +15,9 @@ import { useRoute } from 'vue-router'
 import { DebugBar, type CollectorMeta } from '@quazardous/qddebug'
 import { adminPanels, adminPanelsMeta } from 'qdadm/modules/debug'
 import StatePanel from './debug/StatePanel.vue'
-import { debugBridge } from './shell/debugBridge'
-import FrontShell from './shell/FrontShell.vue'
-import AdminShell from './shell/AdminShell.vue'
+import { debugBridge } from './debugBridge'
+import FrontShell from './FrontShell.vue'
+import AdminShell from './AdminShell.vue'
 
 const route = useRoute()
 const isAdmin = computed(() => route.path.startsWith('/admin'))

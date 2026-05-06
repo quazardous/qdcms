@@ -33,5 +33,20 @@ export default defineConfig({
     fs: {
       allow: [resolve(here, '../..'), qdadmRoot],
     },
+    // Classic-backend mode : when VITE_QDCMS_BACKEND_MODE=remote, the
+    // SPA's in-tab bridge is dropped from the bundle (see main.ts)
+    // and `/api/qdcms/*` is forwarded to the demo Node server. Default
+    // target picks up `VITE_QDCMS_API_URL` (`.env.example`); falls
+    // back to localhost:5181 (the server's default port).
+    proxy:
+      process.env.VITE_QDCMS_BACKEND_MODE === 'remote'
+        ? {
+            '/api/qdcms': {
+              target:
+                process.env.VITE_QDCMS_API_URL ?? 'http://localhost:5181',
+              changeOrigin: true,
+            },
+          }
+        : undefined,
   },
 })

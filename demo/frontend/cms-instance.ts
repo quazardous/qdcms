@@ -20,7 +20,7 @@
  */
 
 import { createCms, DefaultPageComposer } from 'qdcms'
-import { signals } from './shell/signals'
+import { signals } from './signals'
 
 export const cms = createCms({
   signals,

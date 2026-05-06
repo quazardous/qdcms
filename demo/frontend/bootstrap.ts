@@ -26,8 +26,8 @@ import { createApp, type App as VueApp, type Component } from 'vue'
 import { router, buildUrl } from './router'
 import { cms } from './cms-instance'
 import './cms' // side-effect: registers blocks/layouts/placements
-import { installQdadm } from './admin/install-qdadm'
-import { debugBridge } from './shell/debugBridge'
+import { installQdadm } from './install-qdadm'
+import { debugBridge } from './debugBridge'
 import { addQdcmsCollectors } from './debug/qdcmsCollectors'
 
 export interface BootstrapInput {

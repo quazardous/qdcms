@@ -3,13 +3,21 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "demo/frontend",
+    "demo/backend"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=demo",
+    "dev": "npm run dev --workspace=demo-frontend",
+    "dev:remote": "VITE_QDCMS_BACKEND_MODE=remote npm run dev --workspace=demo-frontend",
+    "dev:server": "npm run dev --workspace=demo-backend-server",
+    "dev:full": "concurrently --names server,spa --prefix-colors blue,magenta \"npm:dev:server\" \"npm:dev:remote\"",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "dedup": "bash scripts/dedup-qdadm-vue.sh",
     "postinstall": "bash scripts/dedup-qdadm-vue.sh || true"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
   }
 }

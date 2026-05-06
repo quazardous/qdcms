@@ -18,7 +18,7 @@
  */
 
 import type { BrowserPlugin, BrowserSeed } from '@quazardous/qdcms-backend/browser'
-import { realizationSeed } from './data/realizations'
+import { realizationSeed } from './content/realizations'
 
 export interface QdcmsAppConfig {
   /**
