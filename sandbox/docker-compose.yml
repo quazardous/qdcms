@@ -33,11 +33,13 @@
 # overriding the demo's config) would slot in here as additional
 # bind mounts at /demo/config/<file>.yaml. Defer until needed.
 #
-# node_modules live in container-isolated named docker volumes
-# (sandbox-{core,demo,qdadm}-node-modules). Host's node_modules
-# stays untouched — no cross-contamination from sandbox runs.
-# The image pre-creates the mount points owned by homer so the
-# volumes inherit the right ownership at first init.
+# node_modules live as plain host directories under sandbox/
+# ({core,demo,qdadm}/node_modules). Container-isolated from the
+# host's working tree (no cross-contamination from sandbox runs)
+# while still inspectable / cleanable with normal file tools
+# (rm, ls) — no docker volume magic. The container runs as
+# homer (UID matching the host user) so writes through the
+# bind mounts have the right ownership on disk.
 
 services:
   qdcms:
@@ -56,10 +58,10 @@ services:
       - ../demo:/demo
       - ./demo/data:/demo/data
       - ./demo/.compiled:/demo/.compiled
-      # Container-isolated node_modules. Host's stays untouched.
-      - sandbox-core-node-modules:/core/node_modules
-      - sandbox-demo-node-modules:/demo/node_modules
-      - sandbox-qdadm-node-modules:/qdadm/node_modules
+      # Container-isolated node_modules — host's stays untouched.
+      - ./core/node_modules:/core/node_modules
+      - ./demo/node_modules:/demo/node_modules
+      - ./qdadm/node_modules:/qdadm/node_modules
     working_dir: /demo
     # Direct port mapping kept for non-Traefik access (curl, CI).
     ports:
@@ -141,11 +143,6 @@ services:
       - traefik.http.routers.qdcms-sandbox-dashboard.entrypoints=web,websecure
       - traefik.http.routers.qdcms-sandbox-dashboard.tls=true
       - traefik.http.routers.qdcms-sandbox-dashboard.service=api@internal
-
-volumes:
-  sandbox-core-node-modules:
-  sandbox-demo-node-modules:
-  sandbox-qdadm-node-modules:
 
 networks:
   default:

@@ -15,3 +15,16 @@ sandbox/demo/.compiled/*
 sandbox/docker-compose.env
 sandbox/traefik/certs/*
 !sandbox/traefik/certs/.gitkeep
+# Sandbox node_modules : commit empty mountpoints so the
+# bind-mount targets exist on first checkout. Override the
+# top-level `node_modules` rule by un-ignoring the dirs
+# themselves and keeping only their content ignored.
+!sandbox/core/node_modules/
+sandbox/core/node_modules/*
+!sandbox/core/node_modules/.gitkeep
+!sandbox/demo/node_modules/
+sandbox/demo/node_modules/*
+!sandbox/demo/node_modules/.gitkeep
+!sandbox/qdadm/node_modules/
+sandbox/qdadm/node_modules/*
+!sandbox/qdadm/node_modules/.gitkeep

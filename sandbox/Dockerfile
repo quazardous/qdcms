@@ -5,13 +5,12 @@
 #  - npm + git + bash + make + curl available for tooling.
 #  - SQLite client + libs for ad-hoc DB inspection.
 #  - Repo source mounted at /core, /demo, /qdadm by docker-compose ;
-#    node_modules ride in named docker volumes (container-isolated,
-#    host stays untouched).
+#    node_modules bind-mounted from sandbox/{core,demo,qdadm}/
+#    node_modules (container-isolated, host's working tree stays
+#    untouched).
 #  - Container runs as `homer` (UID/GID matching the host's user
-#    via DEMO_UID/DEMO_GID build args). The image pre-creates the
-#    node_modules mount points owned by homer so docker's named-
-#    volume init inherits homer ownership — no entrypoint chown
-#    needed.
+#    via DEMO_UID/DEMO_GID build args) so file ownership stays
+#    coherent across the bind mounts.
 
 FROM node:22-bookworm-slim
 
@@ -51,11 +50,6 @@ SHELL ["/bin/bash", "-lc"]
 RUN npm install -g \
       tsx@4 \
       pnpm@9
-
-# Pre-create the named-volume mount points owned by homer so the
-# named volume's initial state inherits the right ownership.
-RUN mkdir -p /core/node_modules /demo/node_modules /qdadm/node_modules \
- && chown -R "${DEMO_UID}:${DEMO_GID}" /core /demo /qdadm
 
 USER homer
 WORKDIR /demo
