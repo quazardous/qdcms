@@ -10,6 +10,7 @@
     ".": "./src/index.ts",
     "./config": "./src/config/index.ts",
     "./entity": "./src/entity/index.ts",
+    "./module": "./src/module/index.ts",
     "./registry": "./src/registry/index.ts",
     "./loader": "./src/loader/index.ts",
     "./migration": "./src/migration/index.ts",
