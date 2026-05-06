@@ -12,3 +12,4 @@ demo/.compiled
 sandbox/demo/.compiled/*
 !sandbox/demo/.compiled/.gitkeep
 .env.local
+sandbox/docker-compose.env

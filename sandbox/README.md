@@ -44,6 +44,8 @@ sandbox/
 ├── README.md                ← this file
 ├── Makefile                 ← driver — `make help` is the spec
 ├── docker-compose.yml       ← qdcms + traefik services
+├── docker-compose.env-dist  ← committed env template (ports)
+├── docker-compose.env       ← LOCAL env (gitignored, auto-copied from -dist)
 ├── Dockerfile               ← Node 22 + tooling
 ├── traefik/
 │   ├── traefik.yaml         ← Traefik static config
@@ -52,6 +54,19 @@ sandbox/
     ├── data/                ← sandbox-isolated SQLite (gitignored)
     └── .compiled/           ← sandbox-isolated compiled config
 ```
+
+## Per-machine ports (`docker-compose.env`)
+
+The Makefile loads `docker-compose.env` to know which host ports
+to bind. On first invocation any target auto-copies
+`docker-compose.env-dist` to `docker-compose.env` (gitignored).
+Edit your local file when defaults clash :
+
+| Var                      | Default | Maps to                           |
+|---|---|---|
+| `SANDBOX_HTTP_PORT`      | 80      | Traefik HTTP entrypoint            |
+| `SANDBOX_FRONTEND_PORT`  | 5180    | Direct port to qdcms's Vite dev    |
+| `SANDBOX_BACKEND_PORT`   | 5181    | Direct port to qdcms's Express     |
 
 ## Multi-domain routing (Traefik)
 

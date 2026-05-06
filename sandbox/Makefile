@@ -8,7 +8,7 @@
 # (qdcms framework) and /demo (instance). WORKDIR=/core so the
 # `qdcms` bin from /core/node_modules/.bin is on PATH.
 
-DOCKER_COMPOSE ?= docker compose
+DOCKER_COMPOSE ?= docker compose --env-file ./docker-compose.env
 SERVICE        ?= qdcms
 
 EXEC     = $(DOCKER_COMPOSE) exec -T $(SERVICE)
@@ -19,6 +19,18 @@ EXEC_TTY = $(DOCKER_COMPOSE) exec $(SERVICE)
 # inside the container.
 EXEC_CORE = $(EXEC) sh -c
 EXEC_DEMO = $(EXEC) sh -lc 'cd /demo &&'
+
+# Auto-bootstrap docker-compose.env from the committed template
+# on first invocation. Every actionable target depends on this so
+# fresh clones Just Work : `make up` copies env-dist → env, then
+# proceeds. The Makefile shells out via $(DOCKER_COMPOSE) which
+# fails loud if the env file is missing, so we never reach docker
+# without it.
+docker-compose.env:
+	@if [ ! -f docker-compose.env ]; then \
+	  cp docker-compose.env-dist docker-compose.env; \
+	  echo "[sandbox] copied docker-compose.env from -dist (edit to override ports)"; \
+	fi
 
 .DEFAULT_GOAL := help
 
@@ -33,27 +45,27 @@ help: ## List available targets
 # ─── Lifecycle ──────────────────────────────────────────────────
 
 .PHONY: build
-build: ## (Re)build the sandbox image
+build: docker-compose.env ## (Re)build the sandbox image
 	$(DOCKER_COMPOSE) build
 
 .PHONY: up
-up: ## Start the sandbox container in the background
+up: docker-compose.env ## Start the sandbox containers in the background
 	$(DOCKER_COMPOSE) up -d
 
 .PHONY: down
-down: ## Stop the sandbox and remove the container
+down: docker-compose.env ## Stop the sandbox and remove containers
 	$(DOCKER_COMPOSE) down
 
 .PHONY: nuke
-nuke: ## Stop + remove container AND named volumes (fresh node_modules)
+nuke: docker-compose.env ## Stop + remove containers AND named volumes (fresh node_modules)
 	$(DOCKER_COMPOSE) down -v
 
 .PHONY: status
-status: ## Show container state
+status: docker-compose.env ## Show container state
 	$(DOCKER_COMPOSE) ps
 
 .PHONY: logs
-logs: ## Tail container logs
+logs: docker-compose.env ## Tail container logs
 	$(DOCKER_COMPOSE) logs -f
 
 # ─── In-container actions ──────────────────────────────────────
@@ -113,16 +125,18 @@ plugin-test: ## Run tests for a single plugin. Use: make plugin-test PLUGIN=qdcm
 
 # ─── Diagnostics ────────────────────────────────────────────────
 
+-include ./docker-compose.env
+
 .PHONY: urls
 urls: ## Print the sandbox URLs (Traefik routes + direct ports)
 	@echo "Sandbox URLs (start with 'make up' first) :"
-	@echo "  Traefik routes (HTTP) :"
-	@echo "    Frontend  → http://demo-frontend.qdcms.localhost"
-	@echo "    Backend   → http://demo-backend.qdcms.localhost"
-	@echo "    Dashboard → http://traefik.qdcms.localhost"
+	@echo "  Traefik routes (HTTP, port $(SANDBOX_HTTP_PORT)) :"
+	@echo "    Frontend  → http://demo-frontend.qdcms.localhost$(if $(filter-out 80,$(SANDBOX_HTTP_PORT)),:$(SANDBOX_HTTP_PORT))"
+	@echo "    Backend   → http://demo-backend.qdcms.localhost$(if $(filter-out 80,$(SANDBOX_HTTP_PORT)),:$(SANDBOX_HTTP_PORT))"
+	@echo "    Dashboard → http://traefik.qdcms.localhost$(if $(filter-out 80,$(SANDBOX_HTTP_PORT)),:$(SANDBOX_HTTP_PORT))"
 	@echo "  Direct ports (no Traefik) :"
-	@echo "    Frontend  → http://localhost:$${SANDBOX_FRONTEND_PORT:-5180}"
-	@echo "    Backend   → http://localhost:$${SANDBOX_BACKEND_PORT:-5181}"
+	@echo "    Frontend  → http://localhost:$(SANDBOX_FRONTEND_PORT)"
+	@echo "    Backend   → http://localhost:$(SANDBOX_BACKEND_PORT)"
 	@echo "  Note : *.qdcms.localhost auto-resolves to 127.0.0.1 in"
 	@echo "  modern browsers ; for curl, use --resolve or a host alias."
 
