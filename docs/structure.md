@@ -134,6 +134,8 @@ qdcms/                                 ← repo root (umbrella ; no package.json
     ├── config/                        ← *.yaml, .compiled/ (gitignored)
     ├── content/                       ← seed data
     ├── data/                          ← sqlite (gitignored)
+    ├── public/                        ← static assets served at site root
+    │                                    (favicon, og images, robots.txt…)
     ├── frontend/                      ← SPA workspace
     └── backend/                       ← Node server workspace
 ```
@@ -504,7 +506,13 @@ instances/<my-instance>/               ← SPA + bespoke for this site only
 │   └── flower-craft/
 │       ├── package.json
 │       └── src/
-└── public/                            ← brand assets
+└── public/                            ← static assets at instance umbrella —
+                                         served at the SPA's URL root AND
+                                         reachable by the backend in classic
+                                         mode (favicon, og images, robots,
+                                         sitemap…). NEVER place a public/
+                                         under frontend/ — the frontend is
+                                         an app, not a static-file root.
 ```
 
 #### 6.3.B Out-of-instance bespoke (multi-site reuse)
@@ -873,7 +881,11 @@ my-instance/
 │   └── <my-theme>/
 │       ├── package.json
 │       └── src/           ← idem
-└── public/                ← static assets
+└── public/                ← static assets at instance umbrella
+                              (favicon, og images, robots, sitemap…) ;
+                              served by the SPA at the URL root and by
+                              the backend in classic mode. NEVER nest
+                              under frontend/ — frontend is an app.
 ```
 
 **At the instance root, names speak.** `blocks/`, `pages/`,

@@ -16,6 +16,11 @@ const qdadmRoot = resolve(here, '../../../qdadm')
 
 export default defineConfig({
   base: process.env.BASE_PATH || '/',
+  // Static assets served as-is at the SPA's URL root. Lives at the
+  // INSTANCE umbrella (../public) rather than Vite's default
+  // `<root>/public` so the backend can serve the same files in
+  // classic mode (favicon, og images, robots.txt, sitemap.xml).
+  publicDir: resolve(here, '..', 'public'),
   plugins: [vue()],
   resolve: {
     dedupe: ['vue'],
