@@ -114,10 +114,10 @@ plugin-test: ## Run tests for a single plugin. Use: make plugin-test PLUGIN=qdcm
 # ─── Diagnostics ────────────────────────────────────────────────
 
 .PHONY: doctor
-doctor: ## Run the full diagnostic suite (compile + tests, structured output)
+doctor: ## Run the full diagnostic suite (config doctor + tests)
 	$(EXEC) bash -lc 'set -e; \
 	  echo "[doctor] Node: $$(node --version)"; \
 	  echo "[doctor] npm: $$(npm --version)"; \
-	  echo "[doctor] qdcms install:"; npx qdcms install --instance demo/config 2>&1 | sed "s/^/  /"; \
+	  echo "[doctor] qdcms config:doctor:"; npx qdcms config:doctor demo/config 2>&1 | sed "s/^/  /"; \
 	  echo "[doctor] tests:"; npm test --workspaces --if-present 2>&1 | tail -5 | sed "s/^/  /"; \
 	  echo "[doctor] OK"'
