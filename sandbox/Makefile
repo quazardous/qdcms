@@ -57,8 +57,15 @@ build: docker-compose.env ## (Re)build the sandbox image
 	$(DOCKER_COMPOSE) build
 
 .PHONY: up
-up: docker-compose.env ## Start the sandbox containers in the background
+up: docker-compose.env ## Start the sandbox containers + print URLs
 	$(DOCKER_COMPOSE) up -d
+	@echo
+	@$(MAKE) --no-print-directory urls
+	@if [ ! -f traefik/certs/dev.crt ]; then \
+	  echo; \
+	  echo "  HTTPS : Traefik runs but no cert is loaded yet."; \
+	  echo "          Run 'make certs' (needs mkcert installed)."; \
+	fi
 
 .PHONY: down
 down: docker-compose.env ## Stop the sandbox and remove containers
@@ -142,25 +149,49 @@ plugin-test: ## Run tests for a single plugin. Use: make plugin-test PLUGIN=qdcm
 
 .PHONY: urls
 urls: ## Print the sandbox URLs (Traefik routes + direct ports)
-	@PORT_SUFFIX="$(if $(filter-out 80,$(SANDBOX_HTTP_PORT)),:$(SANDBOX_HTTP_PORT))"; \
-	echo "Sandbox URLs (start with 'make up' first) :"; \
+	@HTTP_SUFFIX="$(if $(filter-out 80,$(SANDBOX_HTTP_PORT)),:$(SANDBOX_HTTP_PORT))"; \
+	HTTPS_SUFFIX="$(if $(filter-out 443,$(SANDBOX_HTTPS_PORT)),:$(SANDBOX_HTTPS_PORT))"; \
+	echo "Sandbox URLs :"; \
 	echo ""; \
-	echo "  Direct topology (Vite dev / Express, on Traefik :$(SANDBOX_HTTP_PORT)) :"; \
-	echo "    Frontend  → http://demo-frontend.qdcms.localhost$$PORT_SUFFIX"; \
-	echo "    Backend   → http://demo-backend.qdcms.localhost$$PORT_SUFFIX"; \
+	echo "  Direct topology (Vite dev / Express via Traefik) :"; \
+	echo "    Frontend   →  http://demo-frontend.qdcms.localhost$$HTTP_SUFFIX"; \
+	echo "                  https://demo-frontend.qdcms.localhost$$HTTPS_SUFFIX"; \
+	echo "    Backend    →  http://demo-backend.qdcms.localhost$$HTTP_SUFFIX"; \
+	echo "                  https://demo-backend.qdcms.localhost$$HTTPS_SUFFIX"; \
 	echo ""; \
-	echo "  nginx topology (prod-like — needs 'make build-spa' first) :"; \
-	echo "    Demo      → http://demo.nginx.qdcms.localhost$$PORT_SUFFIX"; \
+	echo "  nginx topology (prod-like — run 'make build-spa' first) :"; \
+	echo "    Demo       →  http://demo.nginx.qdcms.localhost$$HTTP_SUFFIX"; \
+	echo "                  https://demo.nginx.qdcms.localhost$$HTTPS_SUFFIX"; \
 	echo ""; \
 	echo "  Direct ports (no Traefik) :"; \
-	echo "    Frontend  → http://localhost:$(SANDBOX_FRONTEND_PORT)"; \
-	echo "    Backend   → http://localhost:$(SANDBOX_BACKEND_PORT)"; \
+	echo "    Frontend   →  http://localhost:$(SANDBOX_FRONTEND_PORT)"; \
+	echo "    Backend    →  http://localhost:$(SANDBOX_BACKEND_PORT)"; \
 	echo ""; \
 	echo "  Traefik dashboard :"; \
-	echo "    → http://traefik.qdcms.localhost$$PORT_SUFFIX"; \
+	echo "               →  http://traefik.qdcms.localhost$$HTTP_SUFFIX"; \
 	echo ""; \
-	echo "  Note : *.qdcms.localhost auto-resolves to 127.0.0.1 in"; \
-	echo "  modern browsers ; for curl, use --resolve or a host alias."
+	echo "  Note : *.qdcms.localhost auto-resolves to 127.0.0.1"; \
+	echo "  in modern browsers. HTTPS uses an mkcert-issued local"; \
+	echo "  cert ('make certs') trusted in your browser via the"; \
+	echo "  mkcert root CA — no certificate warnings."
+
+.PHONY: certs
+certs: ## Generate trusted local certs via mkcert (one-time setup)
+	@if ! command -v mkcert >/dev/null 2>&1; then \
+	  echo "[certs] mkcert is not installed."; \
+	  echo "[certs] Install :  https://github.com/FiloSottile/mkcert"; \
+	  echo "[certs] Then run :  mkcert -install   (one-time, installs the local root CA)"; \
+	  echo "[certs] Then re-run :  make certs"; \
+	  exit 1; \
+	fi
+	mkdir -p traefik/certs
+	cd traefik/certs && mkcert \
+	  -cert-file dev.crt -key-file dev.key \
+	  'qdcms.localhost' '*.qdcms.localhost' '*.nginx.qdcms.localhost' \
+	  localhost 127.0.0.1
+	@echo
+	@echo "[certs] OK. Bounce the sandbox to pick them up :"
+	@echo "        make down && make up"
 
 .PHONY: doctor
 doctor: ## Run the full diagnostic suite (config doctor + tests)

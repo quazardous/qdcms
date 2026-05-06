@@ -73,18 +73,39 @@ Edit your local file when defaults clash :
 | `SANDBOX_FRONTEND_PORT`  | 5180    | Direct port to qdcms's Vite dev    |
 | `SANDBOX_BACKEND_PORT`   | 5181    | Direct port to qdcms's Express     |
 
-## Multi-domain routing (Traefik)
+## Multi-domain routing (Traefik) + HTTPS
 
 A bundled Traefik routes the sandbox over named subdomains so
 tests that care about cookie domains, auth redirect URLs, or
-multi-tenant scenarios get a realistic environment :
+multi-tenant scenarios get a realistic environment. Both HTTP
+(`:80`) and HTTPS (`:443`) entrypoints are wired :
 
-| URL                                       | Routes to                  |
+| URL (HTTP/HTTPS)                          | Routes to                  |
 |---|---|
-| `http://demo-frontend.qdcms.localhost`    | qdcms:5180 (Vite dev)      |
-| `http://demo-backend.qdcms.localhost`     | qdcms:5181 (Express API)   |
-| `http://demo.nginx.qdcms.localhost`       | nginx:80 → SPA dist + API  |
-| `http://traefik.qdcms.localhost`          | Traefik dashboard          |
+| `(s)://demo-frontend.qdcms.localhost`     | qdcms:5180 (Vite dev)      |
+| `(s)://demo-backend.qdcms.localhost`      | qdcms:5181 (Express API)   |
+| `(s)://demo.nginx.qdcms.localhost`        | nginx:80 → SPA dist + API  |
+| `(s)://traefik.qdcms.localhost`           | Traefik dashboard          |
+
+`make up` prints the catalogue. `make urls` re-prints it.
+
+### Trusted local HTTPS via mkcert
+
+For HTTPS without browser warnings, the sandbox uses [mkcert](https://github.com/FiloSottile/mkcert) :
+
+```sh
+# One-time, install mkcert + its local CA :
+brew install mkcert        # or apt install mkcert
+mkcert -install            # adds the mkcert CA to your browser/system trust store
+
+# Generate the sandbox certs :
+make certs                 # writes traefik/certs/dev.{crt,key}
+make down && make up       # bounce traefik to load them
+```
+
+Without `make certs`, Traefik falls back to its built-in
+self-signed cert ; HTTPS still works but the browser warns on
+first visit.
 
 The `*.nginx.qdcms.localhost` basename rehearses the production
 nginx topology described in [`docs/deploy.md`](../docs/deploy.md)

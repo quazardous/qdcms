@@ -46,6 +46,9 @@ entryPoints:
   web:
     address: ':80'
 
-  # Uncomment when adding TLS support :
-  # websecure:
-  #   address: ':443'
+  # HTTPS entrypoint. Cert + key are loaded from
+  # /etc/traefik/certs/ (mounted from sandbox/traefik/certs/).
+  # The dynamic config (dynamic.yaml) declares the default
+  # certificate.
+  websecure:
+    address: ':443'
