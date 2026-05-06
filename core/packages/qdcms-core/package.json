@@ -9,6 +9,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./config": "./src/config/index.ts",
+    "./dc": "./src/dc/index.ts",
     "./entity": "./src/entity/index.ts",
     "./kernel": "./src/kernel/index.ts",
     "./module": "./src/module/index.ts",

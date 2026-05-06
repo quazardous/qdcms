@@ -8,6 +8,7 @@
 import { Args, Command, Flags } from '@oclif/core'
 import { basename, dirname, join, resolve } from 'node:path'
 import { ConfigModule } from '@quazardous/qdcms-core/config'
+import { DCModule } from '@quazardous/qdcms-core/dc'
 import { Kernel, registerSources } from '@quazardous/qdcms-core/kernel'
 
 /**
@@ -71,7 +72,7 @@ export default class ConfigCompile extends Command {
     // topology so every contributor's namespaces participate in
     // validation.
     const kernel = new Kernel()
-    registerSources(kernel, { modules: [ConfigModule] })
+    registerSources(kernel, { modules: [ConfigModule, DCModule] })
 
     const t0 = performance.now()
     const result = await ConfigModule.compile({ instanceDir, outDir, kernel })

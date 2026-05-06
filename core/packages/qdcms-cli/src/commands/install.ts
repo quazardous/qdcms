@@ -9,6 +9,7 @@
 import { Command, Flags } from '@oclif/core'
 import { basename, dirname, join, resolve } from 'node:path'
 import { ConfigModule } from '@quazardous/qdcms-core/config'
+import { DCModule } from '@quazardous/qdcms-core/dc'
 import { Kernel, registerSources } from '@quazardous/qdcms-core/kernel'
 
 /**
@@ -51,7 +52,7 @@ export default class Install extends Command {
     // Build a kernel + register the framework's modules. Plugin
     // discovery joins here in a follow-up slice.
     const kernel = new Kernel()
-    registerSources(kernel, { modules: [ConfigModule] })
+    registerSources(kernel, { modules: [ConfigModule, DCModule] })
 
     // Stage : config:compile.
     {

@@ -7,6 +7,7 @@
  * consumer (qdcms-backend, qdcms-frontend, qdcms-admin).
  *
  * Subpath exports:
+ *   ./dc          — DCModule (dynamic content, citizenship='module')
  *   ./entity      — EntityDescriptor, Repository, Storage contracts
  *   ./kernel      — Kernel (slot registry + topology resolver) + Slot/ChainEntry
  *   ./module      — Module base class + lifecycle context types

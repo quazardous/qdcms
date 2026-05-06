@@ -15,6 +15,7 @@
 import { Args, Command, Flags } from '@oclif/core'
 import { basename, dirname, join, resolve } from 'node:path'
 import { ConfigModule } from '@quazardous/qdcms-core/config'
+import { DCModule } from '@quazardous/qdcms-core/dc'
 import { Kernel, registerSources } from '@quazardous/qdcms-core/kernel'
 
 function defaultOutDir(instanceDir: string): string {
@@ -63,7 +64,7 @@ export default class ConfigDoctor extends Command {
     // configSchemas flow into the compile (see config:compile for
     // the rationale).
     const kernel = new Kernel()
-    registerSources(kernel, { modules: [ConfigModule] })
+    registerSources(kernel, { modules: [ConfigModule, DCModule] })
 
     const t0 = performance.now()
     let result
