@@ -1,0 +1,25 @@
+// status: framework preset — instances extend this, no edit
+//
+// Defaults for a Vue 3 SPA qdcms instance running under Vite +
+// vue-tsc: strict TypeScript, ES2022, ESM, DOM types in scope,
+// vite/client types for `import.meta.env`. Includes `.vue` files
+// so vue-tsc picks them up by default. Instances import via
+// `{ "extends": "qdcms/tsconfig.preset.json" }` — no need to copy
+// the options into every instance.
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "jsx": "preserve",
+    "lib": ["ES2022", "DOM"],
+    "types": ["vite/client"],
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true
+  },
+  "include": ["**/*.ts", "**/*.vue"]
+}
