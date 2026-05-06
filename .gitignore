@@ -9,6 +9,7 @@ demo/data/*.sqlite-journal
 sandbox/demo/data/*.sqlite
 sandbox/demo/data/*.sqlite-journal
 demo/.compiled
+demo/**/.compiled
 sandbox/demo/.compiled/*
 !sandbox/demo/.compiled/.gitkeep
 .env.local

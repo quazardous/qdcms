@@ -7,9 +7,19 @@
  */
 
 import { Command, Flags } from '@oclif/core'
-import { resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { ConfigModule } from '@quazardous/qdcms-core/config'
 import { Kernel, registerSources } from '@quazardous/qdcms-core/kernel'
+
+/**
+ * Umbrella convention for compiled artefacts :
+ * `<instance-umbrella>/.compiled/<input-basename>/`. Matches the
+ * default in `config:compile` so a single instance has one
+ * `.compiled/` tree at the umbrella level (gitignored once).
+ */
+function defaultOutDir(instanceDir: string): string {
+  return join(dirname(instanceDir), '.compiled', basename(instanceDir))
+}
 
 export default class Install extends Command {
   static override description =
@@ -34,6 +44,7 @@ export default class Install extends Command {
   public async run(): Promise<void> {
     const { flags } = await this.parse(Install)
     const instanceDir = resolve(flags.instance)
+    const outDir = defaultOutDir(instanceDir)
 
     const stages: Array<{ name: string; ms: number; ok: boolean; detail?: string }> = []
 
@@ -46,7 +57,7 @@ export default class Install extends Command {
     {
       const t0 = performance.now()
       try {
-        const r = await ConfigModule.compile({ instanceDir, kernel })
+        const r = await ConfigModule.compile({ instanceDir, outDir, kernel })
         stages.push({
           name: 'config:compile',
           ms: Math.round(performance.now() - t0),
